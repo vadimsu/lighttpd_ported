@@ -75,6 +75,7 @@ static int l_issetugid(void) {
 #  define issetugid l_issetugid
 # endif
 #endif
+#include <ipaugenblick_api.h>
 
 static volatile sig_atomic_t srv_shutdown = 0;
 static volatile sig_atomic_t graceful_shutdown = 0;
@@ -560,9 +561,9 @@ int main (int argc, char **argv) {
 	interval.it_interval.tv_sec = 1;
 	interval.it_interval.tv_usec = 0;
 	interval.it_value.tv_sec = 1;
-	interval.it_value.tv_usec = 0;
+	interval.it_value.tv_usec = 0;	
 #endif
-
+	ipaugenblick_app_init(argc,argv,argv[0]);
 
 	/* for nice %b handling in strfime() */
 	setlocale(LC_TIME, "C");

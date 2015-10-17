@@ -36,6 +36,7 @@
 #  endif
 # endif
 #endif
+#include <ipaugenblick_api.h>
 
 #ifdef USE_OPENSSL
 static void ssl_info_callback(const SSL *ssl, int where, int ret) {
@@ -255,20 +256,17 @@ static int network_server_init(server *srv, buffer *host_token, specific_config 
 
 	if (srv_socket->fd == -1) {
 		srv_socket->addr.plain.sa_family = AF_INET;
-		if (-1 == (srv_socket->fd = socket(srv_socket->addr.plain.sa_family, SOCK_STREAM, IPPROTO_TCP))) {
+		if (-1 == (srv_socket->fd = ipaugenblick_open_socket(srv_socket->addr.plain.sa_family, SOCK_STREAM, -1))) {
 			log_error_write(srv, __FILE__, __LINE__, "ss", "socket failed:", strerror(errno));
 			goto error_free_socket;
 		}
 	}
 
-	/* set FD_CLOEXEC now, fdevent_fcntl_set is called later; needed for pipe-logger forks */
-	fd_close_on_exec(srv_socket->fd);
-
 	/* */
 	srv->cur_fds = srv_socket->fd;
 
 	val = 1;
-	if (setsockopt(srv_socket->fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) < 0) {
+	if (ipaugenblick_setsockopt(srv_socket->fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) < 0) {
 		log_error_write(srv, __FILE__, __LINE__, "ss", "socketsockopt(SO_REUSEADDR) failed:", strerror(errno));
 		goto error_free_socket;
 	}
@@ -287,7 +285,7 @@ static int network_server_init(server *srv, buffer *host_token, specific_config 
 
 			if (s->set_v6only) {
 				val = 1;
-				if (-1 == setsockopt(srv_socket->fd, IPPROTO_IPV6, IPV6_V6ONLY, &val, sizeof(val))) {
+				if (-1 == ipaugenblick_setsockopt(srv_socket->fd, IPPROTO_IPV6, IPV6_V6ONLY, &val, sizeof(val))) {
 					log_error_write(srv, __FILE__, __LINE__, "ss", "socketsockopt(IPV6_V6ONLY) failed:", strerror(errno));
 					goto error_free_socket;
 				}
@@ -399,7 +397,7 @@ static int network_server_init(server *srv, buffer *host_token, specific_config 
 		goto error_free_socket;
 	}
 
-	if (0 != bind(srv_socket->fd, (struct sockaddr *) &(srv_socket->addr), addr_len)) {
+	if (0 != ipaugenblick_bind(srv_socket->fd, (struct sockaddr *) &(srv_socket->addr), addr_len)) {
 		switch(srv_socket->addr.plain.sa_family) {
 		case AF_UNIX:
 			log_error_write(srv, __FILE__, __LINE__, "sds",
@@ -415,7 +413,7 @@ static int network_server_init(server *srv, buffer *host_token, specific_config 
 		goto error_free_socket;
 	}
 
-	if (-1 == listen(srv_socket->fd, 128 * 8)) {
+	if (-1 == ipaugenblick_listen_socket(srv_socket->fd/*, 128 * 8*/)) {
 		log_error_write(srv, __FILE__, __LINE__, "ss", "listen failed: ", strerror(errno));
 		goto error_free_socket;
 	}
@@ -436,7 +434,7 @@ static int network_server_init(server *srv, buffer *host_token, specific_config 
 #ifdef TCP_DEFER_ACCEPT
 	} else if (s->defer_accept) {
 		int v = s->defer_accept;
-		if (-1 == setsockopt(srv_socket->fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &v, sizeof(v))) {
+		if (-1 == ipaugenblick_setsockopt(srv_socket->fd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &v, sizeof(v))) {
 			log_error_write(srv, __FILE__, __LINE__, "ss", "can't set TCP_DEFER_ACCEPT: ", strerror(errno));
 		}
 #endif
@@ -446,7 +444,7 @@ static int network_server_init(server *srv, buffer *host_token, specific_config 
 		struct accept_filter_arg afa;
 		memset(&afa, 0, sizeof(afa));
 		strcpy(afa.af_name, "httpready");
-		if (setsockopt(srv_socket->fd, SOL_SOCKET, SO_ACCEPTFILTER, &afa, sizeof(afa)) < 0) {
+		if (ipaugenblick_setsockopt(srv_socket->fd, SOL_SOCKET, SO_ACCEPTFILTER, &afa, sizeof(afa)) < 0) {
 			if (errno != ENOENT) {
 				log_error_write(srv, __FILE__, __LINE__, "ss", "can't set accept-filter 'httpready': ", strerror(errno));
 			}
@@ -501,7 +499,7 @@ int network_close(server *srv) {
 				fdevent_unregister(srv->ev, srv_socket->fd);
 			}
 
-			close(srv_socket->fd);
+			ipaugenblick_close(srv_socket->fd);
 		}
 
 		buffer_free(srv_socket->srv_token);
@@ -1069,7 +1067,7 @@ int network_write_chunkqueue(server *srv, connection *con, chunkqueue *cq, off_t
 	 */
 	if (cq->first && cq->first->next) {
 		corked = 1;
-		setsockopt(con->fd, IPPROTO_TCP, TCP_CORK, &corked, sizeof(corked));
+		ipaugenblick_setsockopt(con->fd, IPPROTO_TCP, TCP_CORK, &corked, sizeof(corked));
 	}
 #endif
 
@@ -1089,7 +1087,7 @@ int network_write_chunkqueue(server *srv, connection *con, chunkqueue *cq, off_t
 #ifdef TCP_CORK
 	if (corked) {
 		corked = 0;
-		setsockopt(con->fd, IPPROTO_TCP, TCP_CORK, &corked, sizeof(corked));
+		ipaugenblick_setsockopt(con->fd, IPPROTO_TCP, TCP_CORK, &corked, sizeof(corked));
 	}
 #endif
 

@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <ctype.h>
+#include <ipaugenblick_api.h>
 
 static const char hex_chars[] = "0123456789abcdef";
 
@@ -51,7 +52,9 @@ void buffer_reset(buffer *b) {
 
 	/* limit don't reuse buffer larger than ... bytes */
 	if (b->size > BUFFER_MAX_REUSE_SIZE) {
+#if 0 /* VADIM - FIXME */
 		free(b->ptr);
+#endif
 		b->ptr = NULL;
 		b->size = 0;
 	} else if (b->size > 0) {

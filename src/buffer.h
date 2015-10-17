@@ -36,6 +36,7 @@ typedef struct {
 	size_t used;
 	/* size of allocated buffer at *ptr */
 	size_t size;
+	void *descr;
 } buffer;
 
 /* create new buffer; either empty or copy given data */

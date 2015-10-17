@@ -125,18 +125,13 @@ int connection_close(server *srv, connection *con) {
 	}
 #endif
 
-	fdevent_event_del(srv->ev, &(con->fde_ndx), con->fd);
-	fdevent_unregister(srv->ev, con->fd);
 #ifdef __WIN32
 	if (closesocket(con->fd)) {
 		log_error_write(srv, __FILE__, __LINE__, "sds",
 				"(warning) close:", con->fd, strerror(errno));
 	}
 #else
-	if (close(con->fd)) {
-		log_error_write(srv, __FILE__, __LINE__, "sds",
-				"(warning) close:", con->fd, strerror(errno));
-	}
+	ipaugenblick_close(con->fd);
 #endif
 
 	srv->cur_fds--;
@@ -1008,98 +1003,6 @@ found_header_end:
 	return 0;
 }
 
-static handler_t connection_handle_fdevent(server *srv, void *context, int revents) {
-	connection *con = context;
-
-	joblist_append(srv, con);
-
-	if (con->srv_socket->is_ssl) {
-		/* ssl may read and write for both reads and writes */
-		if (revents & (FDEVENT_IN | FDEVENT_OUT)) {
-			con->is_readable = 1;
-			con->is_writable = 1;
-		}
-	} else {
-		if (revents & FDEVENT_IN) {
-			con->is_readable = 1;
-		}
-		if (revents & FDEVENT_OUT) {
-			con->is_writable = 1;
-			/* we don't need the event twice */
-		}
-	}
-
-
-	if (revents & ~(FDEVENT_IN | FDEVENT_OUT)) {
-		/* looks like an error */
-
-		/* FIXME: revents = 0x19 still means that we should read from the queue */
-		if (revents & FDEVENT_HUP) {
-			if (con->state == CON_STATE_CLOSE) {
-				con->close_timeout_ts = srv->cur_ts - (HTTP_LINGER_TIMEOUT+1);
-			} else {
-				/* sigio reports the wrong event here
-				 *
-				 * there was no HUP at all
-				 */
-#ifdef USE_LINUX_SIGIO
-				if (srv->ev->in_sigio == 1) {
-					log_error_write(srv, __FILE__, __LINE__, "sd",
-						"connection closed: poll() -> HUP", con->fd);
-				} else {
-					connection_set_state(srv, con, CON_STATE_ERROR);
-				}
-#else
-				connection_set_state(srv, con, CON_STATE_ERROR);
-#endif
-
-			}
-		} else if (revents & FDEVENT_ERR) {
-			/* error, connection reset, whatever... we don't want to spam the logfile */
-#if 0
-			log_error_write(srv, __FILE__, __LINE__, "sd",
-					"connection closed: poll() -> ERR", con->fd);
-#endif
-			connection_set_state(srv, con, CON_STATE_ERROR);
-		} else {
-			log_error_write(srv, __FILE__, __LINE__, "sd",
-					"connection closed: poll() -> ???", revents);
-		}
-	}
-
-	if (con->state == CON_STATE_READ ||
-	    con->state == CON_STATE_READ_POST) {
-		connection_handle_read_state(srv, con);
-	}
-
-	if (con->state == CON_STATE_WRITE &&
-	    !chunkqueue_is_empty(con->write_queue) &&
-	    con->is_writable) {
-
-		if (-1 == connection_handle_write(srv, con)) {
-			connection_set_state(srv, con, CON_STATE_ERROR);
-
-			log_error_write(srv, __FILE__, __LINE__, "ds",
-					con->fd,
-					"handle write failed.");
-		}
-	}
-
-	if (con->state == CON_STATE_CLOSE) {
-		/* flush the read buffers */
-		int len;
-		char buf[1024];
-
-		len = read(con->fd, buf, sizeof(buf));
-		if (len == 0 || (len < 0 && errno != EAGAIN && errno != EINTR) ) {
-			con->close_timeout_ts = srv->cur_ts - (HTTP_LINGER_TIMEOUT+1);
-		}
-	}
-
-	return HANDLER_FINISHED;
-}
-
-
 connection *connection_accept(server *srv, server_socket *srv_socket) {
 	/* accept everything */
 
@@ -1121,27 +1024,10 @@ connection *connection_accept(server *srv, server_socket *srv_socket) {
 
 	cnt_len = sizeof(cnt_addr);
 
-	if (-1 == (cnt = accept(srv_socket->fd, (struct sockaddr *) &cnt_addr, &cnt_len))) {
-		switch (errno) {
-		case EAGAIN:
-#if EWOULDBLOCK != EAGAIN
-		case EWOULDBLOCK:
-#endif
-		case EINTR:
-			/* we were stopped _before_ we had a connection */
-		case ECONNABORTED: /* this is a FreeBSD thingy */
-			/* we were stopped _after_ we had a connection */
-			break;
-		case EMFILE:
-			/* out of fds */
-			break;
-		default:
-			log_error_write(srv, __FILE__, __LINE__, "ssd", "accept failed:", strerror(errno), errno);
-		}
-		return NULL;
-	} else {
+	int cnt_len_int = cnt_len;
+	if((cnt = ipaugenblick_accept(srv_socket->fd, (struct sockaddr *) &cnt_addr, &cnt_len_int)) >= 0) {
 		connection *con;
-
+		cnt_len = cnt_len_int;
 		srv->cur_fds++;
 
 		/* ok, we have the connection, register it */
@@ -1158,7 +1044,6 @@ connection *connection_accept(server *srv, server_socket *srv_socket) {
 #if 0
 		gettimeofday(&(con->start_tv), NULL);
 #endif
-		fdevent_register(srv->ev, con->fd, connection_handle_fdevent, con);
 
 		connection_set_state(srv, con, CON_STATE_REQUEST_START);
 
@@ -1166,11 +1051,7 @@ connection *connection_accept(server *srv, server_socket *srv_socket) {
 		con->dst_addr = cnt_addr;
 		buffer_copy_string(con->dst_addr_buf, inet_ntop_cache_get_ip(srv, &(con->dst_addr)));
 		con->srv_socket = srv_socket;
-
-		if (-1 == (fdevent_fcntl_set(srv->ev, con->fd))) {
-			log_error_write(srv, __FILE__, __LINE__, "ss", "fcntl failed: ", strerror(errno));
-			return NULL;
-		}
+	
 #ifdef USE_OPENSSL
 		/* connect FD to SSL */
 		if (srv_socket->is_ssl) {
@@ -1194,6 +1075,7 @@ connection *connection_accept(server *srv, server_socket *srv_socket) {
 #endif
 		return con;
 	}
+	return NULL;
 }
 
 
@@ -1616,23 +1498,14 @@ int connection_state_machine(server *srv, connection *con) {
 	case CON_STATE_READ_POST:
 	case CON_STATE_READ:
 	case CON_STATE_CLOSE:
-		fdevent_event_set(srv->ev, &(con->fde_ndx), con->fd, FDEVENT_IN);
 		break;
 	case CON_STATE_WRITE:
 		/* request write-fdevent only if we really need it
 		 * - if we have data to write
 		 * - if the socket is not writable yet
 		 */
-		if (!chunkqueue_is_empty(con->write_queue) &&
-		    (con->is_writable == 0) &&
-		    (con->traffic_limit_reached == 0)) {
-			fdevent_event_set(srv->ev, &(con->fde_ndx), con->fd, FDEVENT_OUT);
-		} else {
-			fdevent_event_del(srv->ev, &(con->fde_ndx), con->fd);
-		}
 		break;
 	default:
-		fdevent_event_del(srv->ev, &(con->fde_ndx), con->fd);
 		break;
 	}
 
