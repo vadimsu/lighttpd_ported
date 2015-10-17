@@ -16651,8 +16651,8 @@ else
   CHECK_WITH_FASTCGI_TRUE='#'
   CHECK_WITH_FASTCGI_FALSE=
 fi
-
-
+ 
+LIBS="-lrt -ldl -lipaugenblickservice -lrte_eal -lrte_ring -lrte_timer -lrte_mempool -lrte_malloc -lrte_mbuf -lrt -ldl -pthread  $LIBS"
 
 if test "${GCC}" = "yes"; then
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking if $CC supports -Wall -W -Wshadow -pedantic" >&5
@@ -16828,7 +16828,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 fi
-
+LDFLAGS="-L/usr/lib/ipaugenblick  $LDFLAGS"
 LIGHTTPD_VERSION_ID=`echo $PACKAGE_VERSION | $AWK -F '.' '{print "(" $1 " << 16 | " $2 " << 8 | " $3 ")"}'`
 
 cat >>confdefs.h <<_ACEOF
