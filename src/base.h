@@ -28,7 +28,7 @@
 #include "sys-socket.h"
 #include "splaytree.h"
 #include "etag.h"
-
+#include <ipaugenblick_api.h>
 
 #if defined HAVE_LIBSSL && defined HAVE_OPENSSL_SSL_H
 # define USE_OPENSSL
@@ -558,6 +558,8 @@ typedef struct server {
 	buffer *errorlog_buf;
 
 	fdevents *ev, *ev_ins;
+	struct ipaugenblick_fdset readfdset;
+	struct ipaugenblick_fdset writefdset;
 
 	buffer_plugin plugins;
 	void *plugin_slots;

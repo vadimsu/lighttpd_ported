@@ -1016,9 +1016,12 @@ int network_register_fdevents(server *srv) {
 	/* register fdevents after reset */
 	for (i = 0; i < srv->srv_sockets.used; i++) {
 		server_socket *srv_socket = srv->srv_sockets.ptr[i];
-
+#if 0 /* VADIM */
 		fdevent_register(srv->ev, srv_socket->fd, network_server_handle_fdevent, srv_socket);
 		fdevent_event_set(srv->ev, &(srv_socket->fde_ndx), srv_socket->fd, FDEVENT_IN);
+#else
+		ipaugenblick_fdset(srv_socket->fd, &srv->readfdset);
+#endif
 	}
 	return 0;
 }
