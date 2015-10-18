@@ -9,6 +9,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <ipaugenblick_api.h>
 
 int network_write_mem_chunk(server *srv, connection *con, int fd, chunkqueue *cq, off_t *p_max_bytes) {
 	chunk* const c = cq->first;
@@ -71,22 +72,33 @@ int network_write_mem_chunk(server *srv, connection *con, int fd, chunkqueue *cq
 }
 
 int network_write_chunkqueue_write(server *srv, connection *con, int fd, chunkqueue *cq, off_t max_bytes) {
-	while (max_bytes > 0 && NULL != cq->first) {
-		int r = -1;
+	int buffer_count = 0, i;
+	chunk* c = cq->first;
+	while (max_bytes > 0 && c) {
 
 		switch (cq->first->type) {
 		case MEM_CHUNK:
-			r = network_write_mem_chunk(srv, con, fd, cq, &max_bytes);
+			max_bytes -= c->mem->used;
+			buffer_count++;
 			break;
 		case FILE_CHUNK:
-			r = network_write_file_chunk_mmap(srv, con, fd, cq, &max_bytes);
+		//	r = network_write_file_chunk_mmap(srv, con, fd, cq, &max_bytes);
 			break;
 		}
-
-		if (-3 == r) return 0;
-		if (0 != r) return r;
+		c = c->next;
 	}
-
+	struct data_and_descriptor bufs_and_desc[buffer_count];
+	int offsets[buffer_count];
+	int lengths[buffer_count];
+	c = cq->first;
+	for(i = 0; i < buffer_count;i++,c = c->next) {
+		bufs_and_desc[i].pdesc = c->mem->descr;
+		/* VADIM TODO: imcrement refcnt??? */
+		offsets[i] = c->offset;
+		lengths[i] = c->mem->used;
+	}
+	ipaugenblick_send_bulk(fd, bufs_and_desc, offsets, lengths, buffer_count);
+	while(ipaugenblick_socket_kick(fd) != 0);
 	return 0;
 }
 
