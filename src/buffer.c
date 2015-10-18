@@ -24,6 +24,7 @@ buffer* buffer_init(void) {
 	b->ptr = NULL;
 	b->size = 0;
 	b->used = 0;
+	b->descr = NULL;
 
 	return b;
 }
@@ -43,7 +44,7 @@ buffer *buffer_init_string(const char *str) {
 void buffer_free(buffer *b) {
 	if (NULL == b) return;
 
-	free(b->ptr);
+	ipaugenblick_release_tx_buffer(b->descr);
 	free(b);
 }
 
@@ -51,13 +52,14 @@ void buffer_reset(buffer *b) {
 	if (NULL == b) return;
 
 	/* limit don't reuse buffer larger than ... bytes */
-	if (b->size > BUFFER_MAX_REUSE_SIZE) {
 #if 0 /* VADIM - FIXME */
+	if (b->size > BUFFER_MAX_REUSE_SIZE) {
 		free(b->ptr);
-#endif
 		b->ptr = NULL;
 		b->size = 0;
-	} else if (b->size > 0) {
+	} else 
+#endif
+		if (b->size > 0) {
 		b->ptr[0] = '\0';
 	}
 
@@ -88,6 +90,7 @@ static size_t buffer_align_size(size_t size) {
 /* make sure buffer is at least "size" big. discard old data */
 static void buffer_alloc(buffer *b, size_t size) {
 	force_assert(NULL != b);
+	force_assert(buffer_align_size(size) <= 1448);
 	if (0 == size) size = 1;
 
 	if (size <= b->size) return;
@@ -96,7 +99,7 @@ static void buffer_alloc(buffer *b, size_t size) {
 
 	b->used = 0;
 	b->size = buffer_align_size(size);
-	b->ptr = malloc(b->size);
+	b->ptr = ipaugenblick_get_buffer(b->size, -1, &b->descr);
 
 	force_assert(NULL != b->ptr);
 }
@@ -107,9 +110,8 @@ static void buffer_realloc(buffer *b, size_t size) {
 	if (0 == size) size = 1;
 
 	if (size <= b->size) return;
-
+	force_assert(buffer_align_size(size) <= 1448);
 	b->size = buffer_align_size(size);
-	b->ptr = realloc(b->ptr, b->size);
 
 	force_assert(NULL != b->ptr);
 }

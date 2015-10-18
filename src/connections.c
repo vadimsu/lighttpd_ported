@@ -35,6 +35,7 @@
 #endif
 
 #include "sys-socket.h"
+#include <ipaugenblick_api.h>
 
 typedef struct {
 	        PLUGIN_DATA;
@@ -312,9 +313,6 @@ static int connection_handle_read_ssl(server *srv, connection *con) {
 /* 0: everything ok, -1: error, -2: con closed */
 static int connection_handle_read(server *srv, connection *con) {
 	int len;
-	char *mem = NULL;
-	size_t mem_len = 0;
-	int toread;
 
 	if (con->srv_socket->is_ssl) {
 		return connection_handle_read_ssl(srv, con);
@@ -330,77 +328,28 @@ static int connection_handle_read(server *srv, connection *con) {
 
 	len = recv(con->fd, mem, mem_len, 0);
 #else /* __WIN32 */
-	if (ioctl(con->fd, FIONREAD, &toread) || toread == 0 || toread <= 4*1024) {
-		if (toread > MAX_READ_LIMIT) toread = MAX_READ_LIMIT;
-	} else {
-		toread = 4096;
-	}
-	chunkqueue_get_memory(con->read_queue, &mem, &mem_len, 0, toread);
-
-	len = read(con->fd, mem, mem_len);
-#endif /* __WIN32 */
-
-	chunkqueue_use_memory(con->read_queue, len > 0 ? len : 0);
-
-	if (len < 0) {
-		con->is_readable = 0;
-
-#if defined(__WIN32)
-		{
-			int lastError = WSAGetLastError();
-			switch (lastError) {
-			case EAGAIN:
-				return 0;
-			case EINTR:
-				/* we have been interrupted before we could read */
-				con->is_readable = 1;
-				return 0;
-			case ECONNRESET:
-				/* suppress logging for this error, expected for keep-alive */
-				break;
-			default:
-				log_error_write(srv, __FILE__, __LINE__, "sd", "connection closed - recv failed: ", lastError);
-				break;
-			}
-		}
-#else /* __WIN32 */
-		switch (errno) {
-		case EAGAIN:
-			return 0;
-		case EINTR:
-			/* we have been interrupted before we could read */
-			con->is_readable = 1;
-			return 0;
-		case ECONNRESET:
-			/* suppress logging for this error, expected for keep-alive */
+	
+	do {
+		len = 0;
+		int segment_len = 0;
+		void *pdesc = NULL;
+		void *rxbuff = NULL;
+		buffer *b;
+		if (ipaugenblick_receive(con->fd, &rxbuff, &len, &segment_len,&pdesc) != 0)
 			break;
-		default:
-			log_error_write(srv, __FILE__, __LINE__, "ssd", "connection closed - read failed: ", strerror(errno), errno);
-			break;
-		}
-#endif /* __WIN32 */
-
-		connection_set_state(srv, con, CON_STATE_ERROR);
-
-		return -1;
-	} else if (len == 0) {
-		con->is_readable = 0;
-		/* the other end close the connection -> KEEP-ALIVE */
-
-		/* pipelining */
-
-		return -2;
-	} else if (len != (ssize_t) mem_len) {
-		/* we got less then expected, wait for the next fd-event */
-
-		con->is_readable = 0;
-	}
-
-	con->bytes_read += len;
-#if 0
-	dump_packet(b->ptr, len);
-#endif
-
+		while(rxbuff) {
+                	b = buffer_init();
+			b->ptr = rxbuff;
+			b->size = segment_len;
+			b->descr = pdesc;
+			chunkqueue_append_buffer(con->read_queue,b);
+			chunkqueue_use_memory(con->read_queue, segment_len);
+			con->bytes_read += len;
+                        rxbuff = ipaugenblick_get_next_buffer_segment(&pdesc,&segment_len);
+                }
+	} while(1);
+#endif /* __WIN32 */	
+	
 	return 0;
 }
 
