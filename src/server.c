@@ -583,7 +583,7 @@ int main (int argc, char **argv) {
 #endif
 	srv->srvconf.dont_daemonize = 0;
 
-	while(-1 != (o = getopt(argc, argv, "f:m:hvVDpt"))) {
+	while(-1 != (o = getopt(argc, argv, "f:m:hvVDptc"))) {
 		switch(o) {
 		case 'f':
 			if (srv->config_storage) {
@@ -604,13 +604,13 @@ int main (int argc, char **argv) {
 		case 'p': print_config = 1; break;
 		case 't': test_config = 1; break;
 		case 'D': srv->srvconf.dont_daemonize = 1; break;
-		case 'v': show_version(); return 0;
-		case 'V': show_features(); return 0;
-		case 'h': show_help(); return 0;
+		case 'v': show_version(); /*return 0*/;
+		case 'V': show_features(); /*return 0*/;
+		case 'h': show_help(); /*return 0*/;
 		default:
 			show_help();
-			server_free(srv);
-			return -1;
+//			server_free(srv);
+//			return -1;
 		}
 	}
 
@@ -638,8 +638,8 @@ int main (int argc, char **argv) {
 	}
 
 	if (test_config || print_config) {
-		server_free(srv);
-		return 0;
+//		server_free(srv);
+//		return 0;
 	}
 
 	/* close stdin and stdout, as they are not needed */
