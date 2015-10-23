@@ -54,6 +54,8 @@
 # define USE_LIBEV
 #endif
 
+#include <ipaugenblick_api.h>
+
 struct server;
 
 typedef handler_t (*fdevent_handler)(struct server *srv, void *ctx, int revents);
@@ -82,7 +84,8 @@ typedef enum { FDEVENT_HANDLER_UNSET,
 		FDEVENT_HANDLER_SOLARIS_DEVPOLL,
 		FDEVENT_HANDLER_SOLARIS_PORT,
 		FDEVENT_HANDLER_FREEBSD_KQUEUE,
-		FDEVENT_HANDLER_LIBEV
+		FDEVENT_HANDLER_LIBEV,
+		FDEVENT_HANDLER_IPAUGENBLICK
 } fdevent_handler_t;
 
 
@@ -140,6 +143,11 @@ typedef struct fdevents {
 
 	int select_max_fd;
 #endif
+	struct ipaugenblick_fdset readfdset;
+	struct ipaugenblick_fdset writefdset;
+	struct ipaugenblick_fdset errorfdset;
+	int *ipaugenblick_events;
+	int ipaugenblick_events_current_idx;
 #ifdef USE_SOLARIS_DEVPOLL
 	int devpoll_fd;
 	struct pollfd *devpollfds;

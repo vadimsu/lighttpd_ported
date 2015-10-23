@@ -1257,6 +1257,7 @@ int config_set_defaults(server *srv) {
 		{ FDEVENT_HANDLER_FREEBSD_KQUEUE, "freebsd-kqueue" },
 		{ FDEVENT_HANDLER_FREEBSD_KQUEUE, "kqueue" },
 #endif
+		{ FDEVENT_HANDLER_IPAUGENBLICK, "ipaugenblick" },
 		{ FDEVENT_HANDLER_UNSET,          NULL }
 	};
 

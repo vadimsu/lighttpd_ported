@@ -63,7 +63,7 @@ common_src=buffer.c log.c \
 	data_string.c data_count.c data_array.c \
 	data_integer.c md5.c data_fastcgi.c \
 	fdevent_select.c fdevent_libev.c \
-	fdevent_poll.c fdevent_linux_sysepoll.c \
+	fdevent_poll.c fdevent_linux_sysepoll.c fdevent_ipaugenblick.c \
 	fdevent_solaris_devpoll.c fdevent_solaris_port.c \
 	fdevent_freebsd_kqueue.c \
 	data_config.c \

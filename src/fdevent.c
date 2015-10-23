@@ -72,6 +72,13 @@ fdevents *fdevent_init(server *srv, size_t maxfds, fdevent_handler_t type) {
 		return ev;
 	case FDEVENT_HANDLER_UNSET:
 		break;
+	case FDEVENT_HANDLER_IPAUGENBLICK:
+		if (0 != fdevent_ipaugenblick_init(ev)) {
+			log_error_write(srv, __FILE__, __LINE__, "S",
+				"event-handler fdevent_ipaugenblick_init failed");
+			goto error;
+		}
+		break;
 	}
 
 error:
@@ -201,6 +208,7 @@ void * fdevent_get_context(fdevents *ev, int fd) {
 }
 
 void fd_close_on_exec(int fd) {
+	return;
 #ifdef FD_CLOEXEC
 	if (fd < 0) return;
 	force_assert(-1 != fcntl(fd, F_SETFD, FD_CLOEXEC));
@@ -210,6 +218,7 @@ void fd_close_on_exec(int fd) {
 }
 
 int fdevent_fcntl_set(fdevents *ev, int fd) {
+	return 0;
 	fd_close_on_exec(fd);
 	if ((ev) && (ev->fcntl_set)) return ev->fcntl_set(ev, fd);
 #ifdef O_NONBLOCK
