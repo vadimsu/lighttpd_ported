@@ -43,8 +43,10 @@ buffer *buffer_init_string(const char *str) {
 
 void buffer_free(buffer *b) {
 	if (NULL == b) return;
-
-	ipaugenblick_release_tx_buffer(b->descr);
+	if (b->descr) {
+		ipaugenblick_release_tx_buffer(b->descr);
+		b->descr = NULL;
+	}
 	free(b);
 }
 
@@ -100,7 +102,6 @@ static void buffer_alloc(buffer *b, size_t size) {
 	b->used = 0;
 	b->size = buffer_align_size(size);
 	b->ptr = ipaugenblick_get_buffer(b->size, -1, &b->descr);
-
 	force_assert(NULL != b->ptr);
 }
 
