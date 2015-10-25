@@ -113,7 +113,8 @@ static void buffer_realloc(buffer *b, size_t size) {
 	if (size <= b->size) return;
 	force_assert(buffer_align_size(size) <= 1448);
 	b->size = buffer_align_size(size);
-
+	if (b->ptr == NULL)
+		b->ptr = ipaugenblick_get_buffer(b->size, -1, &b->descr);
 	force_assert(NULL != b->ptr);
 }
 

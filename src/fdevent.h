@@ -143,6 +143,7 @@ typedef struct fdevents {
 
 	int select_max_fd;
 #endif
+	int *ipaugenblick_socket_to_events;
 	struct ipaugenblick_fdset readfdset;
 	struct ipaugenblick_fdset writefdset;
 	struct ipaugenblick_fdset errorfdset;

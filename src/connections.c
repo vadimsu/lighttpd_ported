@@ -342,7 +342,8 @@ static int connection_handle_read(server *srv, connection *con) {
 		while(rxbuff) {
                 	b = buffer_init();
 			b->ptr = rxbuff;
-			b->size = segment_len;
+			b->size = 1448;
+			b->used = segment_len;
 			b->descr = pdesc;
 			chunkqueue_append_buffer(con->read_queue,b);
 			chunkqueue_use_memory(con->read_queue, segment_len);
@@ -1072,7 +1073,7 @@ connection *connection_accept(server *srv, server_socket *srv_socket) {
 		connection *con;
 		cnt_len = cnt_len_int;
 		srv->cur_fds++;
-
+		ipaugenblick_set_socket_select(cnt,srv->ev->epoll_fd);
 		/* ok, we have the connection, register it */
 #if 0
 		log_error_write(srv, __FILE__, __LINE__, "sd",

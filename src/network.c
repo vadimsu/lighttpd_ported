@@ -256,10 +256,14 @@ static int network_server_init(server *srv, buffer *host_token, specific_config 
 
 	if (srv_socket->fd == -1) {
 		srv_socket->addr.plain.sa_family = AF_INET;
-		if (-1 == (srv_socket->fd = ipaugenblick_open_socket(srv_socket->addr.plain.sa_family, SOCK_STREAM, -1))) {
+		printf("%s %d %p\n",__FILE__, __LINE__, srv->ev);
+		if (-1 == (srv_socket->fd = ipaugenblick_open_socket(srv_socket->addr.plain.sa_family, 
+							SOCK_STREAM, 
+							srv->ev ? srv->ev->epoll_fd : -1))) {
 			log_error_write(srv, __FILE__, __LINE__, "ss", "socket failed:", strerror(errno));
 			goto error_free_socket;
 		}
+		printf("%s %d %d\n",__FILE__, __LINE__, srv_socket->fd);
 	}
 
 	/* */
@@ -417,6 +421,7 @@ static int network_server_init(server *srv, buffer *host_token, specific_config 
 		log_error_write(srv, __FILE__, __LINE__, "ss", "listen failed: ", strerror(errno));
 		goto error_free_socket;
 	}
+	//ipaugenblick_set_socket_select(srv_socket->fd, srv->ev->epoll_fd);
 
 	if (s->ssl_enabled) {
 #ifdef USE_OPENSSL
@@ -1016,12 +1021,9 @@ int network_register_fdevents(server *srv) {
 	/* register fdevents after reset */
 	for (i = 0; i < srv->srv_sockets.used; i++) {
 		server_socket *srv_socket = srv->srv_sockets.ptr[i];
-#if 0 /* VADIM */
+
 		fdevent_register(srv->ev, srv_socket->fd, network_server_handle_fdevent, srv_socket);
 		fdevent_event_set(srv->ev, &(srv_socket->fde_ndx), srv_socket->fd, FDEVENT_IN);
-#else
-		ipaugenblick_fdset(srv_socket->fd, &srv->readfdset);
-#endif
 	}
 	return 0;
 }

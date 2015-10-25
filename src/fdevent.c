@@ -77,8 +77,9 @@ fdevents *fdevent_init(server *srv, size_t maxfds, fdevent_handler_t type) {
 			log_error_write(srv, __FILE__, __LINE__, "S",
 				"event-handler fdevent_ipaugenblick_init failed");
 			goto error;
-		}
-		break;
+		}	
+		printf("%s %d %d\n", __FILE__, __LINE__, srv->cur_fds);
+		return ev;
 	}
 
 error:

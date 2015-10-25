@@ -643,8 +643,8 @@ int main (int argc, char **argv) {
 	}
 
 	/* close stdin and stdout, as they are not needed */
-	openDevNull(STDIN_FILENO);
-	openDevNull(STDOUT_FILENO);
+//	openDevNull(STDIN_FILENO);
+//	openDevNull(STDOUT_FILENO);
 
 	if (0 != config_set_defaults(srv)) {
 		log_error_write(srv, __FILE__, __LINE__, "s",
@@ -724,7 +724,15 @@ int main (int argc, char **argv) {
 	} else {
 		srv->max_fds = 4096;
 	}
-
+#if 1 /* VADIM */
+	srv->event_handler = FDEVENT_HANDLER_IPAUGENBLICK;
+	printf("%s %d %d\n",__FILE__,__LINE__,srv->max_fds);
+	if (NULL == (srv->ev = fdevent_init(srv, srv->max_fds + 1, srv->event_handler))) {
+		log_error_write(srv, __FILE__, __LINE__,
+				"s", "fdevent_init failed");
+		return -1;
+	}
+#endif
 	if (i_am_root) {
 		struct group *grp = NULL;
 		struct passwd *pwd = NULL;
@@ -1150,13 +1158,13 @@ int main (int argc, char **argv) {
 		}
 	}
 #endif
-
+#if 0 /* VADIM - need to move before network init */
 	if (NULL == (srv->ev = fdevent_init(srv, srv->max_fds + 1, srv->event_handler))) {
 		log_error_write(srv, __FILE__, __LINE__,
 				"s", "fdevent_init failed");
 		return -1;
 	}
-
+#endif
 	/* libev backend overwrites our SIGCHLD handler and calls waitpid on SIGCHLD; we want our own SIGCHLD handling. */
 #ifdef HAVE_SIGACTION
 	sigaction(SIGCHLD, &act, NULL);
