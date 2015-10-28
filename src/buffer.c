@@ -24,7 +24,8 @@ buffer* buffer_init(void) {
 	b->ptr = NULL;
 	b->size = 0;
 	b->used = 0;
-	b->descr = NULL;
+	b->buffers_count = 0;
+	b->bufs_and_desc = NULL;
 
 	return b;
 }
@@ -43,10 +44,13 @@ buffer *buffer_init_string(const char *str) {
 
 void buffer_free(buffer *b) {
 	if (NULL == b) return;
-	if (b->descr) {
-		ipaugenblick_release_tx_buffer(b->descr);
-		b->descr = NULL;
+	int i;
+	for(i = 0; i < b->number_of_buffers; i++) {
+		ipaugenblick_release_tx_buffer(b->bufs_and_desc[i].pdesc);
 	}
+	free(b->bufs_and_desc);
+	b->bufs_and_desc = NULL;
+	b->number_of_buffers = 0;
 	free(b);
 }
 
@@ -66,6 +70,19 @@ void buffer_reset(buffer *b) {
 	}
 
 	b->used = 0;
+}
+
+unsigned char *buffer_get_byte_addr(buffer *b, int idx)
+{
+	int buffer_idx = idx / 1448;
+	int buffer_offset = idx%1448;
+	return ((unsigned char *)b->bufs_and_desc[buffer_idx].pdata) + buffer_offset;
+}
+
+int buffer_get_contigous_space(buffer *b, int idx)
+{
+	int buffer_offset = idx%1448;
+	return 1448 - buffer_offset;
 }
 
 void buffer_move(buffer *b, buffer *src) {
@@ -91,30 +108,48 @@ static size_t buffer_align_size(size_t size) {
 
 /* make sure buffer is at least "size" big. discard old data */
 static void buffer_alloc(buffer *b, size_t size) {
+	int number_of_buffers;
 	force_assert(NULL != b);
-	force_assert(buffer_align_size(size) <= 1448);
 	if (0 == size) size = 1;
 
 	if (size <= b->size) return;
 
-	if (NULL != b->ptr) free(b->ptr);
+	force_assert(b->ptr == NULL);
 
 	b->used = 0;
-	b->size = buffer_align_size(size);
-	b->ptr = ipaugenblick_get_buffer(b->size, -1, &b->descr);
+	number_of_buffers = size / 1448 + ((size%1448) != 0);
+	b->bufs_and_desc = calloc(number_of_buffers, sizeof(b->bufs_and_desc[0]));
+	force_assert(ipaugenblick_get_buffers_bulk(size, 
+						-1, 
+						number_of_buffers, 
+						b->bufs_and_desc) == 0);
+	b->number_of_buffers = number_of_buffers;
+	b->size = size;
+	b->ptr = b->bufs_and_desc[0].pdata;
 	force_assert(NULL != b->ptr);
 }
 
 /* make sure buffer is at least "size" big. keep old data */
 static void buffer_realloc(buffer *b, size_t size) {
+	int number_of_buffers;
 	force_assert(NULL != b);
 	if (0 == size) size = 1;
 
 	if (size <= b->size) return;
-	force_assert(buffer_align_size(size) <= 1448);
-	b->size = buffer_align_size(size);
+
+	int delta = size - b->size;
+	number_of_buffers = delta / 1448 + ((delta%1448) != 0);
+	b->bufs_and_desc = realloc(b->bufs_and_desc, 
+			(number_of_buffers *sizeof(b->bufs_and_desc[0])));
+	force_assert(ipaugenblick_get_buffers_bulk(
+			size,
+			-1, 
+			number_of_buffers - b->number_of_buffers, 
+			&b->bufs_and_desc[b->number_of_buffers]) == 0);
+	b->number_of_buffers = number_of_buffers;
+	b->size = size;
 	if (b->ptr == NULL)
-		b->ptr = ipaugenblick_get_buffer(b->size, -1, &b->descr);
+		b->ptr = b->bufs_and_desc[0].pdata;
 	force_assert(NULL != b->ptr);
 }
 
@@ -158,7 +193,8 @@ void buffer_string_set_length(buffer *b, size_t len) {
 	buffer_realloc(b, len + 1);
 
 	b->used = len + 1;
-	b->ptr[len] = '\0';
+	char *p (char *)buffer_get_byte_addr(b, len);
+	*p = '\0';
 }
 
 void buffer_commit(buffer *b, size_t size)
@@ -175,8 +211,8 @@ void buffer_commit(buffer *b, size_t size)
 		force_assert(b->used + size <= b->size);
 		b->used += size;
 	}
-
-	b->ptr[b->used - 1] = '\0';
+	char *p = (char *)buffer_get_byte_addr(b, b->used - 1);
+	*p = '\0';
 }
 
 void buffer_copy_string(buffer *b, const char *s) {
@@ -189,7 +225,33 @@ void buffer_copy_string_len(buffer *b, const char *s, size_t s_len) {
 
 	buffer_string_prepare_copy(b, s_len);
 
-	if (0 != s_len) memcpy(b->ptr, s, s_len);
+	int copied = 0;
+	while(copied < s_len) {
+		int space = buffer_get_contigous_space(b, copied);
+		unsigned char *p = buffer_get_byte_addr(b, copied);
+		memcpy(p, s + copied, (s_len - copied > space) ? space : (s_len - copied));
+		copied += (s_len - copied > space) ? space : (s_len - copied);
+	}
+
+	buffer_commit(b, s_len);
+}
+
+static void buffer_copy_string_len_with_offset(buffer *b, 
+						int offset,
+						const char *s, 
+						size_t s_len) {
+	force_assert(NULL != b);
+	force_assert(NULL != s || s_len == 0);
+
+	buffer_string_prepare_copy(b, s_len);
+
+	int copied = 0;
+	while(copied < s_len) {
+		int space = buffer_get_contigous_space(b, copied + offset);
+		unsigned char *p = buffer_get_byte_addr(b, copied + offset);
+		memcpy(p, s + copied, (s_len - copied > space) ? space : (s_len - copied));
+		copied += (s_len - copied > space) ? space : (s_len - copied);
+	}
 
 	buffer_commit(b, s_len);
 }
@@ -199,7 +261,15 @@ void buffer_copy_buffer(buffer *b, const buffer *src) {
 		buffer_string_prepare_copy(b, 0);
 		b->used = 0; /* keep special empty state for now */
 	} else {
-		buffer_copy_string_len(b, src->ptr, buffer_string_length(src));
+		int copied = 0;
+		int tocopy = buffer_string_length(src);
+		while(copied < tocopy) {
+			int space = buffer_get_contigous_space(src, copied);
+			unsigned char *p = buffer_get_byte_addr(src, copied);
+			int tocopy2 = (tocopy - copied > space) ? space : (tocopy - copied);
+			buffer_copy_string_len_with_offset(b, copied, p, tocopy2);
+			copied += tocopy2;
+		}
 	}
 }
 
@@ -224,13 +294,17 @@ void buffer_append_string_len(buffer *b, const char *s, size_t s_len) {
 	force_assert(NULL != b);
 	force_assert(NULL != s || s_len == 0);
 
-	target_buf = buffer_string_prepare_append(b, s_len);
-
-	if (0 == s_len) return; /* nothing to append */
-
-	memcpy(target_buf, s, s_len);
-
-	buffer_commit(b, s_len);
+	int copied = 0;
+	while(copied < s_len) {
+		target_buf = buffer_string_prepare_append(b, s_len - copied);
+		int space = buffer_get_contigous_space(b, b->used - 1);
+		int tocopy = ((s_len - copied) > space) ? space : s_len - copied;
+		memcpy(target_buf,s + copied, tocopy);
+		buffer_commit(b, tocopy);
+		copied += tocopy;
+	}
+	unsigned char *p = buffer_get_byte_addr(b, copied);
+	*p = '\0';
 }
 
 void buffer_append_string_buffer(buffer *b, const buffer *src) {

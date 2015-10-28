@@ -36,7 +36,8 @@ typedef struct {
 	size_t used;
 	/* size of allocated buffer at *ptr */
 	size_t size;
-	void *descr;
+	struct data_and_descriptor *bufs_and_desc;
+	int buffers_count;
 } buffer;
 
 /* create new buffer; either empty or copy given data */
@@ -194,5 +195,8 @@ static inline void buffer_append_slash(buffer *b) {
 	size_t len = buffer_string_length(b);
 	if (len > 0 && '/' != b->ptr[len-1]) BUFFER_APPEND_STRING_CONST(b, "/");
 }
+
+unsigned char *buffer_get_byte_addr(buffer *b, int idx);
+int buffer_get_contigous_space(buffer *b, int idx);
 
 #endif
