@@ -160,8 +160,7 @@ char* buffer_string_prepare_copy(buffer *b, size_t size) {
 
 	buffer_alloc(b, size + 1);
 
-	b->used = 1;
-	b->ptr[0] = '\0';
+	buffer_commit(b, 0);
 
 	return b->ptr;
 }
@@ -175,10 +174,6 @@ char* buffer_string_prepare_append(buffer *b, size_t size) {
 		size_t req_size = b->used + size;
 
 		/* not empty, b->used already includes a terminating 0 */
-		force_assert(req_size >= b->used);
-
-		/* check for overflow: unsigned overflow is defined to wrap around */
-		force_assert(req_size >= b->used);
 
 		buffer_realloc(b, req_size);
 
@@ -192,9 +187,7 @@ void buffer_string_set_length(buffer *b, size_t len) {
 
 	buffer_realloc(b, len + 1);
 
-	b->used = len + 1;
-	char *p = (char *)buffer_get_byte_addr(b, len);
-	*p = '\0';
+	buffer_commit(b, len);
 }
 
 void buffer_commit(buffer *b, size_t size)
@@ -209,9 +202,23 @@ void buffer_commit(buffer *b, size_t size)
 		force_assert(b->used + size > b->used);
 
 		force_assert(b->used + size <= b->size);
+		int current_buffer_idx = b->used / 1448;
+		int space = buffer_get_contigous_space(b->used - 1);
 		b->used += size;
+		if (space <= size)
+			ipaugenblick_set_buffer_data_len(
+					b->bufs_and_desc[current_buffer_idx].pdesc,
+					1448);
+		else {
+			int current_length = 
+				ipaugenblick_get_buffer_data_len(
+					b->bufs_and_desc[current_buffer_idx].pdesc);
+			ipaugenblick_set_buffer_data_len(
+				b->bufs_and_desc[current_buffer_idx].pdesc,
+				current_length + size);
+		}
 	}
-	char *p = (char *)buffer_get_byte_addr(b, b->used - 1);
+	char *p = buffer_get_byte_addr(b, b->used - 1);
 	*p = '\0';
 }
 
@@ -352,14 +359,17 @@ void buffer_append_uint_hex(buffer *b, uintmax_t value) {
 //	buffer_commit(b, shift); /* will fill below */
 
 	shift <<= 2; /* count bits now */
+	size_t copied = 0;
 	while (shift > 0) {
 		shift -= 4;
-		if (space == 0) {
+		if (copied == space) {
+			buffer_commit(b, copied);
 			buf = buffer_get_byte_addr(b, b->used - 1);
 			space = buffer_get_contigous_space(b->used - 1);
+			copied = 0;
 		}
 		*(buf++) = hex_chars[(value >> shift) & 0x0F];
-		b->used++;
+		copied++;
 	}
 }
 
@@ -429,16 +439,19 @@ void buffer_append_strftime(buffer *b, const char *format, const struct tm *tm) 
 	}
 
 	buf = buffer_string_prepare_append(b, 255);
-	r = strftime(buf, buffer_string_space(b), format, tm);
+	size_t space = buffer_get_contigous_space(b->used - 1);
+	r = strftime(buf, space, format, tm);
 
 	/* 0 (in some apis buffer_string_space(b)) signals the string may have
 	 * been too small; but the format could also just have lead to an empty
 	 * string
 	 */
-	if (0 == r || r >= buffer_string_space(b)) {
+	if (0 == r || r >= space) {
 		/* give it a second try with a larger string */
-		buf = buffer_string_prepare_append(b, 4095);
-		r = strftime(buf, buffer_string_space(b), format, tm);
+		buffer_string_prepare_append(b, 4095);
+		buf = buffer_get_byte_addr(b, (b->used - 1) + 255);
+		space = buffer_get_contigous_space((b->used - 1) + 255);
+		r = strftime(buf, space, format, tm);
 	}
 
 	if (r >= buffer_string_space(b)) r = 0;
