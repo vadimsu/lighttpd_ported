@@ -45,12 +45,12 @@ buffer *buffer_init_string(const char *str) {
 void buffer_free(buffer *b) {
 	if (NULL == b) return;
 	int i;
-	for(i = 0; i < b->number_of_buffers; i++) {
+	for(i = 0; i < b->buffers_count; i++) {
 		ipaugenblick_release_tx_buffer(b->bufs_and_desc[i].pdesc);
 	}
 	free(b->bufs_and_desc);
 	b->bufs_and_desc = NULL;
-	b->number_of_buffers = 0;
+	b->buffers_count = 0;
 	free(b);
 }
 
@@ -123,7 +123,7 @@ static void buffer_alloc(buffer *b, size_t size) {
 						-1, 
 						number_of_buffers, 
 						b->bufs_and_desc) == 0);
-	b->number_of_buffers = number_of_buffers;
+	b->buffers_count = number_of_buffers;
 	b->size = size;
 	b->ptr = b->bufs_and_desc[0].pdata;
 	force_assert(NULL != b->ptr);
@@ -144,9 +144,9 @@ static void buffer_realloc(buffer *b, size_t size) {
 	force_assert(ipaugenblick_get_buffers_bulk(
 			size,
 			-1, 
-			number_of_buffers - b->number_of_buffers, 
-			&b->bufs_and_desc[b->number_of_buffers]) == 0);
-	b->number_of_buffers = number_of_buffers;
+			number_of_buffers - b->buffers_count, 
+			&b->bufs_and_desc[b->buffers_count]) == 0);
+	b->buffers_count = number_of_buffers;
 	b->size = size;
 	if (b->ptr == NULL)
 		b->ptr = b->bufs_and_desc[0].pdata;
@@ -182,7 +182,7 @@ char* buffer_string_prepare_append(buffer *b, size_t size) {
 
 		buffer_realloc(b, req_size);
 
-		return b->ptr + b->used - 1;
+		return buffer_get_byte_addr(b, b->used - 1);
 	}
 }
 
@@ -193,7 +193,7 @@ void buffer_string_set_length(buffer *b, size_t len) {
 	buffer_realloc(b, len + 1);
 
 	b->used = len + 1;
-	char *p (char *)buffer_get_byte_addr(b, len);
+	char *p = (char *)buffer_get_byte_addr(b, len);
 	*p = '\0';
 }
 
@@ -311,7 +311,14 @@ void buffer_append_string_buffer(buffer *b, const buffer *src) {
 	if (NULL == src) {
 		buffer_append_string_len(b, NULL, 0);
 	} else {
-		buffer_append_string_len(b, src->ptr, buffer_string_length(src));
+		int copied = 0;
+		int tocopy = buffer_string_length(src);
+		while(copied < tocopy) {
+			unsigned char *p = buffer_get_byte_addr(src, copied);
+			int tocopy2 = buffer_get_contigous_space(src, copied);
+			buffer_append_string_len(b, p, tocopy2);
+			copied += tocopy2;
+		}
 	}
 }
 

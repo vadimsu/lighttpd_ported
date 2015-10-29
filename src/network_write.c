@@ -87,18 +87,18 @@ int network_write_chunkqueue_write(server *srv, connection *con, int fd, chunkqu
 		}
 		c = c->next;
 	}
-	struct data_and_descriptor bufs_and_desc[buffer_count];
-	int offsets[buffer_count];
-	int lengths[buffer_count];
 	c = cq->first;
 	for(i = 0; i < buffer_count;i++,c = c->next) {
-		bufs_and_desc[i].pdesc = c->mem->descr;
+		int offsets[c->mem->buffers_count];
+		int lengths[c->mem->buffers_count];
+		for(int j = 0;j < c->mem->buffers_count;j++) {
 		/* VADIM TODO: imcrement refcnt??? */
-		offsets[i] = c->offset;
-		lengths[i] = c->mem->used;
-	}
-	ipaugenblick_send_bulk(fd, bufs_and_desc, offsets, lengths, buffer_count);
-	while(ipaugenblick_socket_kick(fd) != 0);
+			offsets[i] = c->offset;
+			lengths[i] = c->mem->used;
+		}
+		ipaugenblick_send_bulk(fd, c->mem->bufs_and_desc, offsets, lengths, c->mem->buffers_count);
+		while(ipaugenblick_socket_kick(fd) != 0);
+	}	
 	return 0;
 }
 

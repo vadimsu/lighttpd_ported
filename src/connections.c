@@ -344,7 +344,10 @@ static int connection_handle_read(server *srv, connection *con) {
 			b->ptr = rxbuff;
 			b->size = 1448;
 			b->used = segment_len;
-			b->descr = pdesc;
+			b->bufs_and_desc = malloc(sizeof(b->bufs_and_desc[0]));
+			b->buffers_count = 1;
+			b->bufs_and_desc[0].pdesc = pdesc;
+			b->bufs_and_desc[0].pdata = rxbuff;
 			chunkqueue_append_buffer(con->read_queue,b);
 			chunkqueue_use_memory(con->read_queue, segment_len);
 			con->bytes_read += len;
