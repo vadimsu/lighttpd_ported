@@ -72,16 +72,16 @@ void buffer_reset(buffer *b) {
 	b->used = 0;
 }
 
-unsigned char *buffer_get_byte_addr(buffer *b, int idx)
+char *buffer_get_byte_addr(const buffer *b, int idx)
 {
 	int buffer_idx = idx / 1448;
 	int buffer_offset = idx%1448;
-	return ((unsigned char *)b->bufs_and_desc[buffer_idx].pdata) + buffer_offset;
+	return ((char *)b->bufs_and_desc[buffer_idx].pdata) + buffer_offset;
 }
 
-int buffer_get_contigous_space(buffer *b, int idx)
+size_t buffer_get_contigous_space(int idx)
 {
-	int buffer_offset = idx%1448;
+	size_t buffer_offset = idx%1448;
 	return 1448 - buffer_offset;
 }
 
@@ -215,6 +215,19 @@ void buffer_commit(buffer *b, size_t size)
 	*p = '\0';
 }
 
+int buffer_strlen(buffer *b)
+{
+	int i;
+	int len = 0;
+	for(i = 0; i < b->buffers_count;i++) {
+		int len2 = ipaugenblick_get_buffer_data_len(b->bufs_and_desc[i].pdesc);
+		len += len2;
+		if (len2 < 1448)
+			break;
+	}
+	return len;
+}
+
 void buffer_copy_string(buffer *b, const char *s) {
 	buffer_copy_string_len(b, s, NULL != s ? strlen(s) : 0);
 }
@@ -225,12 +238,12 @@ void buffer_copy_string_len(buffer *b, const char *s, size_t s_len) {
 
 	buffer_string_prepare_copy(b, s_len);
 
-	int copied = 0;
+	size_t copied = 0;
 	while(copied < s_len) {
-		int space = buffer_get_contigous_space(b, copied);
-		unsigned char *p = buffer_get_byte_addr(b, copied);
-		memcpy(p, s + copied, (s_len - copied > space) ? space : (s_len - copied));
-		copied += (s_len - copied > space) ? space : (s_len - copied);
+		size_t space = buffer_get_contigous_space(copied);
+		char *p = buffer_get_byte_addr(b, copied);
+		memcpy(p, s + copied, ((s_len - copied) > space) ? space : (s_len - copied));
+		copied += ((s_len - copied) > space) ? space : (s_len - copied);
 	}
 
 	buffer_commit(b, s_len);
@@ -245,10 +258,10 @@ static void buffer_copy_string_len_with_offset(buffer *b,
 
 	buffer_string_prepare_copy(b, s_len);
 
-	int copied = 0;
+	size_t copied = 0;
 	while(copied < s_len) {
-		int space = buffer_get_contigous_space(b, copied + offset);
-		unsigned char *p = buffer_get_byte_addr(b, copied + offset);
+		size_t space = buffer_get_contigous_space(copied + offset);
+		char *p = buffer_get_byte_addr(b, copied + offset);
 		memcpy(p, s + copied, (s_len - copied > space) ? space : (s_len - copied));
 		copied += (s_len - copied > space) ? space : (s_len - copied);
 	}
@@ -261,12 +274,12 @@ void buffer_copy_buffer(buffer *b, const buffer *src) {
 		buffer_string_prepare_copy(b, 0);
 		b->used = 0; /* keep special empty state for now */
 	} else {
-		int copied = 0;
-		int tocopy = buffer_string_length(src);
+		size_t copied = 0;
+		size_t tocopy = buffer_string_length(src);
 		while(copied < tocopy) {
-			int space = buffer_get_contigous_space(src, copied);
-			unsigned char *p = buffer_get_byte_addr(src, copied);
-			int tocopy2 = (tocopy - copied > space) ? space : (tocopy - copied);
+			size_t space = buffer_get_contigous_space(copied);
+			char *p = buffer_get_byte_addr(src, copied);
+			size_t tocopy2 = (tocopy - copied > space) ? space : (tocopy - copied);
 			buffer_copy_string_len_with_offset(b, copied, p, tocopy2);
 			copied += tocopy2;
 		}
@@ -294,16 +307,16 @@ void buffer_append_string_len(buffer *b, const char *s, size_t s_len) {
 	force_assert(NULL != b);
 	force_assert(NULL != s || s_len == 0);
 
-	int copied = 0;
+	size_t copied = 0;
 	while(copied < s_len) {
 		target_buf = buffer_string_prepare_append(b, s_len - copied);
-		int space = buffer_get_contigous_space(b, b->used - 1);
+		size_t space = buffer_get_contigous_space(b->used - 1);
 		int tocopy = ((s_len - copied) > space) ? space : s_len - copied;
 		memcpy(target_buf,s + copied, tocopy);
 		buffer_commit(b, tocopy);
 		copied += tocopy;
 	}
-	unsigned char *p = buffer_get_byte_addr(b, copied);
+	char *p = buffer_get_byte_addr(b, copied);
 	*p = '\0';
 }
 
@@ -314,8 +327,8 @@ void buffer_append_string_buffer(buffer *b, const buffer *src) {
 		int copied = 0;
 		int tocopy = buffer_string_length(src);
 		while(copied < tocopy) {
-			unsigned char *p = buffer_get_byte_addr(src, copied);
-			int tocopy2 = buffer_get_contigous_space(src, copied);
+			char *p = buffer_get_byte_addr(src, copied);
+			size_t tocopy2 = buffer_get_contigous_space(copied);
 			buffer_append_string_len(b, p, tocopy2);
 			copied += tocopy2;
 		}
@@ -335,12 +348,18 @@ void buffer_append_uint_hex(buffer *b, uintmax_t value) {
 	}
 
 	buf = buffer_string_prepare_append(b, shift);
-	buffer_commit(b, shift); /* will fill below */
+	size_t space = buffer_get_contigous_space(b->used - 1);
+//	buffer_commit(b, shift); /* will fill below */
 
 	shift <<= 2; /* count bits now */
 	while (shift > 0) {
 		shift -= 4;
+		if (space == 0) {
+			buf = buffer_get_byte_addr(b, b->used - 1);
+			space = buffer_get_contigous_space(b->used - 1);
+		}
 		*(buf++) = hex_chars[(value >> shift) & 0x0F];
+		b->used++;
 	}
 }
 

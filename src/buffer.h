@@ -196,7 +196,7 @@ static inline void buffer_append_slash(buffer *b) {
 	if (len > 0 && '/' != b->ptr[len-1]) BUFFER_APPEND_STRING_CONST(b, "/");
 }
 
-unsigned char *buffer_get_byte_addr(buffer *b, int idx);
-int buffer_get_contigous_space(buffer *b, int idx);
+char *buffer_get_byte_addr(const buffer *b, int idx);
+size_t buffer_get_contigous_space(int idx);
 
 #endif
