@@ -203,7 +203,7 @@ void buffer_commit(buffer *b, size_t size)
 
 		force_assert(b->used + size <= b->size);
 		int current_buffer_idx = b->used / 1448;
-		int space = buffer_get_contigous_space(b->used - 1);
+		size_t space = buffer_get_contigous_space(b->used - 1);
 		b->used += size;
 		if (space <= size)
 			ipaugenblick_set_buffer_data_len(
@@ -515,14 +515,29 @@ char hex2int(unsigned char hex) {
 
 char * buffer_search_string_len(buffer *b, const char *needle, size_t len) {
 	size_t i;
+	char *p;
 	force_assert(NULL != b);
 	force_assert(0 != len && NULL != needle); /* empty needles not allowed */
 
 	if (b->used < len) return NULL;
-
-	for(i = 0; i < b->used - len; i++) {
-		if (0 == memcmp(b->ptr + i, needle, len)) {
-			return b->ptr + i;
+	size_t remaining = len;
+	size_t tocompare = len > 1448 ? 1448 : len;
+	for(i = 0, p = buffer_get_byte_addr(b, i); i < b->used - remaining;) {	
+		
+		if (0 == memcmp(p, needle, tocompare)) {
+			remaining -= tocompare;
+			if (remaining == 0)
+				return buffer_get_byte_addr(b, i);
+		} else {
+			remaining = len;
+		}
+		if ((i%1448) == 0) {
+			p = buffer_get_byte_addr(b, i);
+			tocompare = remaining > 1448 ? 1448 : remaining;
+		} else {
+			i++;
+			p++;
+			tocompare--;
 		}
 	}
 
@@ -545,32 +560,63 @@ int buffer_string_is_empty(const buffer *b) {
  */
 
 int buffer_is_equal(const buffer *a, const buffer *b) {
+	size_t compared = 0;
 	force_assert(NULL != a && NULL != b);
 
 	if (a->used != b->used) return 0;
 	if (a->used == 0) return 1;
+	
+	while(compared < a->used) {
+		size_t tocompare = ((a->used - compared) > 1448) ? a->used - compared : 1448;
+		char *p1 = buffer_get_byte_addr(a, compared);
+		char *p2 = buffer_get_byte_addr(b, compared);
 
-	return (0 == memcmp(a->ptr, b->ptr, a->used));
+		if (memcmp(p1, p2, tocompare))
+			break;
+		compared += tocompare;
+	}
+
+	return (compared == a->used);
 }
 
 int buffer_is_equal_string(const buffer *a, const char *s, size_t b_len) {
+	size_t compared = 0;
 	force_assert(NULL != a && NULL != s);
 	force_assert(b_len + 1 > b_len);
 
 	if (a->used != b_len + 1) return 0;
-	if (0 != memcmp(a->ptr, s, b_len)) return 0;
-	if ('\0' != a->ptr[a->used-1]) return 0;
+	while(compared < a->used) {
+		size_t tocompare = ((a->used - compared) > 1448) ? a->used - compared : 1448;
+		char *p = buffer_get_byte_addr(a, compared);
 
-	return 1;
+		if (memcmp(p, s, tocompare))
+			break;
+		compared += tocompare;
+		s += tocompare;
+	}
+	char *p = buffer_get_byte_addr(a, a->used - 1);
+	if ('\0' != *p) return 0;
+
+	return (compared == b_len);
 }
 
 /* buffer_is_equal_caseless_string(b, CONST_STR_LEN("value")) */
 int buffer_is_equal_caseless_string(const buffer *a, const char *s, size_t b_len) {
+	size_t compared = 0;
 	force_assert(NULL != a);
 	if (a->used != b_len + 1) return 0;
 	force_assert('\0' == a->ptr[a->used - 1]);
 
-	return (0 == strcasecmp(a->ptr, s));
+	while(compared < a->used) {
+		size_t tocompare = ((a->used - compared) > 1448) ? a->used - compared : 1448;
+		char *p = buffer_get_byte_addr(a, compared);
+
+		if (strncasecmp(p, s, tocompare))
+			break;
+		compared += tocompare;
+		s += tocompare;
+	}
+	return (compared == a->used);
 }
 
 int buffer_caseless_compare(const char *a, size_t a_len, const char *b, size_t b_len) {
@@ -602,7 +648,21 @@ int buffer_is_equal_right_len(const buffer *b1, const buffer *b2, size_t len) {
 	/* buffers too small -> not equal */
 	if (b1->used - 1 < len || b2->used - 1 < len) return 0;
 
-	return 0 == memcmp(b1->ptr + b1->used - 1 - len, b2->ptr + b2->used - 1 - len, len);
+	size_t compared = 0;
+	while(compared < len) {
+		char *p1 = buffer_get_byte_addr(b1, compared + (b1->used - 1));
+		char *p2 = buffer_get_byte_addr(b2, compared + (b2->used - 1));
+		size_t tocompare = buffer_get_contigous_space(compared + (b1->used - 1));
+		if (tocompare > 
+			buffer_get_contigous_space(compared + (b2->used - 1)))
+			tocompare = buffer_get_contigous_space(compared + (b2->used - 1));
+
+		if (memcmp(p1, p2, tocompare))
+			break;
+		compared += tocompare;
+	}
+
+	return (compared == len);
 }
 
 void li_tohex(char *buf, const char *s, size_t s_len) {
@@ -620,7 +680,14 @@ void buffer_copy_string_hex(buffer *b, const char *in, size_t in_len) {
 	force_assert(in_len * 2 > in_len);
 
 	buffer_string_set_length(b, 2 * in_len);
-	li_tohex(b->ptr, in, in_len);
+	size_t processed = 0;
+	while (processed < in_len) {
+		char *p = buffer_get_byte_addr(b, processed);
+		size_t toprocess = (in_len - processed) > 1448 ? 1448 : (in_len - processed);
+		li_tohex(p, in, toprocess);
+		in += toprocess;
+		processed += toprocess;
+	}	
 }
 
 /* everything except: ! ( ) * - . 0-9 A-Z _ a-z */
@@ -815,38 +882,69 @@ void buffer_append_string_encoded(buffer *b, const char *s, size_t s_len, buffer
 	}
 
 	d = (unsigned char*) buffer_string_prepare_append(b, d_len);
-	buffer_commit(b, d_len); /* fill below */
-	force_assert('\0' == *d);
 
 	for (ds = (unsigned char *)s, d_len = 0, ndx = 0; ndx < s_len; ds++, ndx++) {
 		if (map[*ds]) {
 			switch(encoding) {
 			case ENCODING_REL_URI:
 			case ENCODING_REL_URI_PART:
-				d[d_len++] = '%';
-				d[d_len++] = hex_chars[((*ds) >> 4) & 0x0F];
-				d[d_len++] = hex_chars[(*ds) & 0x0F];
+				d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+				if (buffer_get_contigous_space(b->used - 1) < 3) {
+					buffer_commit(b,
+					buffer_get_contigous_space(b->used - 1));
+					d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+				}
+				d[0] = '%';
+				d[1] = hex_chars[((*ds) >> 4) & 0x0F];
+				d[2] = hex_chars[(*ds) & 0x0F];
+				buffer_commit(b, 3);
 				break;
 			case ENCODING_HTML:
 			case ENCODING_MINIMAL_XML:
-				d[d_len++] = '&';
-				d[d_len++] = '#';
-				d[d_len++] = 'x';
-				d[d_len++] = hex_chars[((*ds) >> 4) & 0x0F];
-				d[d_len++] = hex_chars[(*ds) & 0x0F];
-				d[d_len++] = ';';
+				d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+				if (buffer_get_contigous_space(b->used - 1) < 6) {
+					buffer_commit(b, 
+					buffer_get_contigous_space(b->used - 1));
+					d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+				}
+				d[0] = '&';
+				d[1] = '#';
+				d[2] = 'x';
+				d[3] = hex_chars[((*ds) >> 4) & 0x0F];
+				d[4] = hex_chars[(*ds) & 0x0F];
+				d[5] = ';';
+				buffer_commit(b, 6);
 				break;
 			case ENCODING_HEX:
-				d[d_len++] = hex_chars[((*ds) >> 4) & 0x0F];
-				d[d_len++] = hex_chars[(*ds) & 0x0F];
+				d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+				if (buffer_get_contigous_space(b->used - 1) < 2) {
+					buffer_commit(b, 
+					buffer_get_contigous_space(b->used - 1));
+					d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+				}
+				d[0] = hex_chars[((*ds) >> 4) & 0x0F];
+				d[1] = hex_chars[(*ds) & 0x0F];
+				buffer_commit(b, 2);
 				break;
 			case ENCODING_HTTP_HEADER:
-				d[d_len++] = *ds;
-				d[d_len++] = '\t';
+				if (buffer_get_contigous_space(b->used - 1) < 2) {
+					buffer_commit(b, 
+					buffer_get_contigous_space(b->used - 1));
+					d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+				}
+				d[0] = *ds;
+				d[1] = '\t';
+				buffer_commit(b, 2);
 				break;
 			}
 		} else {
+			if (buffer_get_contigous_space(b->used - 1) < 1) {
+				buffer_commit(b, 
+				buffer_get_contigous_space(b->used - 1));
+				d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+			}
 			d[d_len++] = *ds;
+			buffer_commit(b, 1);
 		}
 	}
 }
@@ -880,31 +978,65 @@ void buffer_append_string_c_escaped(buffer *b, const char *s, size_t s_len) {
 	}
 
 	d = (unsigned char*) buffer_string_prepare_append(b, d_len);
-	buffer_commit(b, d_len); /* fill below */
-	force_assert('\0' == *d);
 
 	for (ds = (unsigned char *)s, d_len = 0, ndx = 0; ndx < s_len; ds++, ndx++) {
 		if ((*ds < 0x20) /* control character */
 				|| (*ds >= 0x7f)) { /* DEL + non-ASCII characters */
+			if (buffer_get_contigous_space(b->used - 1) < 1) {
+				buffer_commit(b, 
+				buffer_get_contigous_space(b->used - 1));
+				d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+			}
 			d[d_len++] = '\\';
+			buffer_commit(b, 1);
 			switch (*ds) {
 			case '\t':
-				d[d_len++] = 't';
+				if (buffer_get_contigous_space(b->used - 1) < 1) {
+					buffer_commit(b, 
+					buffer_get_contigous_space(b->used - 1));
+					d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+				}
+				d[0] = 't';
+				buffer_commit(b, 1);
 				break;
 			case '\r':
-				d[d_len++] = 'r';
+				if (buffer_get_contigous_space(b->used - 1) < 1) {
+					buffer_commit(b, 
+					buffer_get_contigous_space(b->used - 1));
+					d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+				}
+				d[0] = 'r';
+				buffer_commit(b, 1);
 				break;
 			case '\n':
-				d[d_len++] = 'n';
+				if (buffer_get_contigous_space(b->used - 1) < 1) {
+					buffer_commit(b, 
+					buffer_get_contigous_space(b->used - 1));
+					d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+				}
+				d[0] = 'n';
+				buffer_commit(b, 1);
 				break;
 			default:
-				d[d_len++] = 'x';
-				d[d_len++] = hex_chars[((*ds) >> 4) & 0x0F];
-				d[d_len++] = hex_chars[(*ds) & 0x0F];
+				if (buffer_get_contigous_space(b->used - 1) < 3) {
+					buffer_commit(b, 
+					buffer_get_contigous_space(b->used - 1));
+					d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+				}
+				d[0] = 'x';
+				d[1] = hex_chars[((*ds) >> 4) & 0x0F];
+				d[2] = hex_chars[(*ds) & 0x0F];
+				buffer_commit(b, 3);
 				break;
 			}
 		} else {
-			d[d_len++] = *ds;
+			if (buffer_get_contigous_space(b->used - 1) < 1) {
+				buffer_commit(b, 
+				buffer_get_contigous_space(b->used - 1));
+				d = (unsigned char*)buffer_get_byte_addr(b, b->used - 1);
+			}
+			d[0] = *ds;
+			buffer_commit(b, 1);
 		}
 	}
 }
@@ -926,18 +1058,25 @@ void buffer_copy_string_encoded_cgi_varnames(buffer *b, const char *s, size_t s_
 	}
 
 	j = buffer_string_length(b);
+	char *p = buffer_get_byte_addr(b, j);
+	if (buffer_get_contigous_space(j) == 0)
+		p = buffer_get_byte_addr(b, ++j);
 	for (i = 0; i < s_len; ++i) {
-		unsigned char cr = s[i];
+		unsigned char cr = s[i];	
 		if (light_isalpha(cr)) {
 			/* upper-case */
 			cr &= ~32;
 		} else if (!light_isdigit(cr)) {
 			cr = '_';
 		}
-		b->ptr[j++] = cr;
+		*p = cr;
+		p++;
+		if (buffer_get_contigous_space(j - 1) == 0)
+			p = buffer_get_byte_addr(b, j);
 	}
-	b->used = j;
-	b->ptr[b->used++] = '\0';
+	b->used = j+1;
+	p = buffer_get_byte_addr(b, j);
+	*p = '\0';
 }
 
 /* decodes url-special-chars inplace.
@@ -952,16 +1091,19 @@ static void buffer_urldecode_internal(buffer *url, int is_query) {
 	force_assert(NULL != url);
 	if (buffer_string_is_empty(url)) return;
 
-	force_assert('\0' == url->ptr[url->used-1]);
-
-	src = (char*) url->ptr;
+	force_assert('\0' == *buffer_get_byte_addr(url, url->used-1));
+	size_t src_idx = 0, dst_idx = 0;
+	src = buffer_get_byte_addr(url, 0);
 
 	while ('\0' != *src) {
 		if ('%' == *src) break;
 		if (is_query && '+' == *src) *src = ' ';
-		src++;
+		src_idx++;
+		if (0 == buffer_get_contigous_space(src_idx)) {
+			src = buffer_get_byte_addr(url, ++src_idx);
 	}
 	dst = src;
+	dst_idx = src_idx;
 
 	while ('\0' != *src) {
 		if (is_query && *src == '+') {
@@ -979,19 +1121,30 @@ static void buffer_urldecode_internal(buffer *url, int is_query) {
 					if (high < 32 || high == 127) high = '_';
 
 					*dst = high;
-					src += 2;
+					if(buffer_get_contigous_space(src_idx) < 2)
+						src = buffer_get_byte_addr(url, src_idx + 2);
+					else
+						src += 2;
+					src_idx += 2;
 				}
 			}
 		} else {
 			*dst = *src;
 		}
-
-		dst++;
-		src++;
+		if(buffer_get_contigous_space(src_idx) == 0) {
+			src = buffer_get_byte_addr(url, ++src_idx);
+		} else
+			src++;
+		if(buffer_get_contigous_space(dst_idx) == 0) {
+			dst = buffer_get_byte_addr(url, ++dst_idx);
+		} else
+			dst++;
+			dst_idx++;
+		}
 	}
 
 	*dst = '\0';
-	url->used = (dst - url->ptr) + 1;
+	url->used = dst_idx + 1;
 }
 
 void buffer_urldecode_path(buffer *url) {
@@ -1020,6 +1173,7 @@ void buffer_path_simplify(buffer *dest, buffer *src)
 	int toklen;
 	char c, pre1;
 	char *start, *slash, *walk, *out;
+	size_t walk_idx = 0,out_idx = 0;
 	unsigned short pre;
 
 	force_assert(NULL != dest && NULL != src);
@@ -1029,7 +1183,7 @@ void buffer_path_simplify(buffer *dest, buffer *src)
 		return;
 	}
 
-	force_assert('\0' == src->ptr[src->used-1]);
+	force_assert('\0' == *buffer_get_byte_addr(src, src->used-1));
 
 	/* might need one character more for the '/' prefix */
 	if (src == dest) {
@@ -1048,24 +1202,53 @@ void buffer_path_simplify(buffer *dest, buffer *src)
 	}
 #endif
 
-	walk  = src->ptr;
-	start = dest->ptr;
-	out   = dest->ptr;
-	slash = dest->ptr;
-
+	walk  = buffer_get_byte_addr(src, 0);
+	start = buffer_get_byte_addr(dest, 0);
+	out   = buffer_get_byte_addr(dest, 0);
+	slash = buffer_get_byte_addr(dest, 0);
+	walk_idx = 0;
 
 	while (*walk == ' ') {
-		walk++;
+		if(buffer_get_contigous_space(walk_idx) == 0)
+			walk = buffer_get_byte_addr(src, ++walk_idx);
+		else {
+			walk++;
+			walk_idx++;
+		}
 	}
 
-	pre1 = *(walk++);
+	pre1 = *walk;
+	if(buffer_get_contigous_space(walk_idx) == 0)
+		walk = buffer_get_byte_addr(src, ++walk_idx);
+	else {
+		walk++;
+		walk_idx++;
+	}
 	c    = *(walk++);
+	if(buffer_get_contigous_space(walk_idx) == 0)
+		walk = buffer_get_byte_addr(src, ++walk_idx);
+	else {
+		walk++;
+		walk_idx++;
+	}
 	pre  = pre1;
 	if (pre1 != '/') {
 		pre = ('/' << 8) | pre1;
-		*(out++) = '/';
+		*out = '/';
+		if(buffer_get_contigous_space(out_idx) == 0)
+			out = buffer_get_byte_addr(dest, ++out_idx);
+		else {
+			out++;
+			out_idx++;
+		}
 	}
-	*(out++) = pre1;
+	*out = pre1;
+	if(buffer_get_contigous_space(out_idx) == 0)
+		out = buffer_get_byte_addr(dest, ++out_idx);
+	else {
+		out++;
+		out_idx++;
+	}
 
 	if (pre1 == '\0') {
 		dest->used = (out - start) + 1;
@@ -1078,14 +1261,32 @@ void buffer_path_simplify(buffer *dest, buffer *src)
 			if (toklen == 3 && pre == (('.' << 8) | '.')) {
 				out = slash;
 				if (out > start) {
-					out--;
-					while (out > start && *out != '/') out--;
+					out_idx--;	
+					out = buffer_get_byte_addr(dest, out_idx);
+					while (out > start && *out != '/') {
+						out_idx--;
+						out = buffer_get_byte_addr(dest, out_idx);
+					}
 				}
 
-				if (c == '\0') out++;
+				if (c == '\0') {
+					if(buffer_get_contigous_space(out_idx) == 0)
+						out = buffer_get_byte_addr(dest, ++out_idx);
+					else {
+						out++;
+						out_idx++;
+					}
+				}
 			} else if (toklen == 1 || pre == (('/' << 8) | '.')) {
 				out = slash;
-				if (c == '\0') out++;
+				if (c == '\0') {
+					if(buffer_get_contigous_space(out_idx) == 0)
+						out = buffer_get_byte_addr(dest, ++out_idx);
+					else {
+						out++;
+						out_idx++;
+					}
+				}
 			}
 
 			slash = out;
@@ -1098,8 +1299,18 @@ void buffer_path_simplify(buffer *dest, buffer *src)
 		c    = *walk;
 		*out = pre1;
 
-		out++;
-		walk++;
+		if(buffer_get_contigous_space(out_idx) == 0)
+			out = buffer_get_byte_addr(dest, ++out_idx);
+		else {
+			out++;
+			out_idx++;
+		}
+		if(buffer_get_contigous_space(walk_idx) == 0)
+			walk = buffer_get_byte_addr(src, ++walk_idx);
+		else {
+			walk++;
+			walk_idx++;
+		}
 	}
 
 	buffer_string_set_length(dest, out - start);
@@ -1128,9 +1339,16 @@ int light_isalnum(int c) {
 void buffer_to_lower(buffer *b) {
 	size_t i;
 
-	for (i = 0; i < b->used; ++i) {
-		char c = b->ptr[i];
-		if (c >= 'A' && c <= 'Z') b->ptr[i] |= 0x20;
+	char *p = buffer_get_byte_addr(b, 0);
+	for (i = 0; i < b->used; ) {
+		char c = *p;
+		if (c >= 'A' && c <= 'Z') *p |= 0x20;
+		if(buffer_get_contigous_space(i) == 0)
+			p = buffer_get_byte_addr(b, ++i);
+		else {
+			p++;
+			i++;
+		}
 	}
 }
 
@@ -1138,9 +1356,17 @@ void buffer_to_lower(buffer *b) {
 void buffer_to_upper(buffer *b) {
 	size_t i;
 
+	char *p = buffer_get_byte_addr(b, 0);
+
 	for (i = 0; i < b->used; ++i) {
-		char c = b->ptr[i];
-		if (c >= 'A' && c <= 'Z') b->ptr[i] &= ~0x20;
+		char c = *p;
+		if (c >= 'A' && c <= 'Z') *p &= ~0x20;
+		if(buffer_get_contigous_space(i) == 0)
+			p = buffer_get_byte_addr(b, ++i);
+		else {
+			p++;
+			i++;
+		}
 	}
 }
 
