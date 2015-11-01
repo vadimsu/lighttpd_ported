@@ -209,5 +209,5 @@ int fdevent_solaris_devpoll_init(fdevents *ev);
 int fdevent_solaris_port_init(fdevents *ev);
 int fdevent_freebsd_kqueue_init(fdevents *ev);
 int fdevent_libev_init(fdevents *ev);
-
+int fdevent_ipaugenblick_init(fdevents *ev);
 #endif

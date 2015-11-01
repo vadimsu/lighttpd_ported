@@ -15,6 +15,20 @@ static const char hex_chars[] = "0123456789abcdef";
  *
  */
 
+static void dump_buffer(buffer *b)
+{
+#if 0
+	int i;
+
+	printf("used %d size %d segments %d\n",b->used,b->size,b->buffers_count);
+	for(i = 0;i < b->buffers_count;i++) {
+		char *p = (char *)b->bufs_and_desc[i].pdata;
+		printf("%s",p);
+	}
+	printf("\n");
+#endif
+}
+
 buffer* buffer_init(void) {
 	buffer *b;
 
@@ -76,6 +90,8 @@ char *buffer_get_byte_addr(const buffer *b, int idx)
 {
 	int buffer_idx = idx / 1448;
 	int buffer_offset = idx%1448;
+
+	force_assert(buffer_idx < b->buffers_count);
 	return ((char *)b->bufs_and_desc[buffer_idx].pdata) + buffer_offset;
 }
 
@@ -105,7 +121,7 @@ static size_t buffer_align_size(size_t size) {
 	if (size + align < size) return size;
 	return size + align;
 }
-
+static void buffer_realloc(buffer *b, size_t size);
 /* make sure buffer is at least "size" big. discard old data */
 static void buffer_alloc(buffer *b, size_t size) {
 	int number_of_buffers;
@@ -114,7 +130,10 @@ static void buffer_alloc(buffer *b, size_t size) {
 
 	if (size <= b->size) return;
 
-	force_assert(b->ptr == NULL);
+	if(b->ptr != NULL) {
+		buffer_realloc(b, size);
+		return;
+	}
 
 	b->used = 0;
 	number_of_buffers = size / 1448 + ((size%1448) != 0);
@@ -124,7 +143,7 @@ static void buffer_alloc(buffer *b, size_t size) {
 						number_of_buffers, 
 						b->bufs_and_desc) == 0);
 	b->buffers_count = number_of_buffers;
-	b->size = size;
+	b->size = /*size*/b->buffers_count*1448;
 	b->ptr = b->bufs_and_desc[0].pdata;
 	force_assert(NULL != b->ptr);
 }
@@ -133,6 +152,7 @@ static void buffer_alloc(buffer *b, size_t size) {
 static void buffer_realloc(buffer *b, size_t size) {
 	int number_of_buffers;
 	force_assert(NULL != b);
+
 	if (0 == size) size = 1;
 
 	if (size <= b->size) return;
@@ -140,14 +160,14 @@ static void buffer_realloc(buffer *b, size_t size) {
 	int delta = size - b->size;
 	number_of_buffers = delta / 1448 + ((delta%1448) != 0);
 	b->bufs_and_desc = realloc(b->bufs_and_desc, 
-			(number_of_buffers *sizeof(b->bufs_and_desc[0])));
+			((b->buffers_count + number_of_buffers) *sizeof(b->bufs_and_desc[0])));
 	force_assert(ipaugenblick_get_buffers_bulk(
 			size,
 			-1, 
-			number_of_buffers - b->buffers_count, 
+			number_of_buffers,
 			&b->bufs_and_desc[b->buffers_count]) == 0);
-	b->buffers_count = number_of_buffers;
-	b->size = size;
+	b->buffers_count += number_of_buffers;
+	b->size = /*size*/b->buffers_count*1448;
 	if (b->ptr == NULL)
 		b->ptr = b->bufs_and_desc[0].pdata;
 	force_assert(NULL != b->ptr);
@@ -159,7 +179,7 @@ char* buffer_string_prepare_copy(buffer *b, size_t size) {
 	force_assert(size + 1 > size);
 
 	buffer_alloc(b, size + 1);
-
+	b->used = 0;
 	buffer_commit(b, 0);
 
 	return b->ptr;
@@ -200,7 +220,6 @@ void buffer_commit(buffer *b, size_t size)
 	if (size > 0) {
 		/* check for overflow: unsigned overflow is defined to wrap around */
 		force_assert(b->used + size > b->used);
-
 		force_assert(b->used + size <= b->size);
 		int current_buffer_idx = b->used / 1448;
 		size_t space = buffer_get_contigous_space(b->used - 1);
@@ -244,7 +263,6 @@ void buffer_copy_string_len(buffer *b, const char *s, size_t s_len) {
 	force_assert(NULL != s || s_len == 0);
 
 	buffer_string_prepare_copy(b, s_len);
-
 	size_t copied = 0;
 	while(copied < s_len) {
 		size_t space = buffer_get_contigous_space(copied);
@@ -254,6 +272,7 @@ void buffer_copy_string_len(buffer *b, const char *s, size_t s_len) {
 	}
 
 	buffer_commit(b, s_len);
+	dump_buffer(b);
 }
 
 static void buffer_copy_string_len_with_offset(buffer *b, 
@@ -262,18 +281,18 @@ static void buffer_copy_string_len_with_offset(buffer *b,
 						size_t s_len) {
 	force_assert(NULL != b);
 	force_assert(NULL != s || s_len == 0);
-
-	buffer_string_prepare_copy(b, s_len);
+//printf("%s %s\n",__func__,s);
 
 	size_t copied = 0;
 	while(copied < s_len) {
 		size_t space = buffer_get_contigous_space(copied + offset);
 		char *p = buffer_get_byte_addr(b, copied + offset);
-		memcpy(p, s + copied, (s_len - copied > space) ? space : (s_len - copied));
-		copied += (s_len - copied > space) ? space : (s_len - copied);
+		memcpy(p, s + copied, ((s_len - copied) > space) ? space : (s_len - copied));
+		copied += ((s_len - copied) > space) ? space : (s_len - copied);
 	}
-
+	force_assert(copied == s_len);
 	buffer_commit(b, s_len);
+	dump_buffer(b);
 }
 
 void buffer_copy_buffer(buffer *b, const buffer *src) {
@@ -283,6 +302,7 @@ void buffer_copy_buffer(buffer *b, const buffer *src) {
 	} else {
 		size_t copied = 0;
 		size_t tocopy = buffer_string_length(src);
+		buffer_string_prepare_copy(b, tocopy);
 		while(copied < tocopy) {
 			size_t space = buffer_get_contigous_space(copied);
 			char *p = buffer_get_byte_addr(src, copied);
@@ -290,7 +310,10 @@ void buffer_copy_buffer(buffer *b, const buffer *src) {
 			buffer_copy_string_len_with_offset(b, copied, p, tocopy2);
 			copied += tocopy2;
 		}
+		force_assert(b->used == src->used);
 	}
+	dump_buffer(src);
+	dump_buffer(b);
 }
 
 void buffer_append_string(buffer *b, const char *s) {
@@ -319,12 +342,17 @@ void buffer_append_string_len(buffer *b, const char *s, size_t s_len) {
 		target_buf = buffer_string_prepare_append(b, s_len - copied);
 		size_t space = buffer_get_contigous_space(b->used - 1);
 		int tocopy = ((s_len - copied) > space) ? space : s_len - copied;
+		if (tocopy > strlen(s+copied))
+			tocopy = strlen(s+copied);
 		memcpy(target_buf,s + copied, tocopy);
 		buffer_commit(b, tocopy);
 		copied += tocopy;
 	}
-	char *p = buffer_get_byte_addr(b, copied);
-	*p = '\0';
+	if (b->used > 0) {
+		char *p = buffer_get_byte_addr(b, b->used-1);
+		*p = '\0';
+	}
+	dump_buffer(b);
 }
 
 void buffer_append_string_buffer(buffer *b, const buffer *src) {
@@ -333,13 +361,23 @@ void buffer_append_string_buffer(buffer *b, const buffer *src) {
 	} else {
 		int copied = 0;
 		int tocopy = buffer_string_length(src);
+
 		while(copied < tocopy) {
 			char *p = buffer_get_byte_addr(src, copied);
 			size_t tocopy2 = buffer_get_contigous_space(copied);
+			if ((tocopy2 + copied) > src->used)
+				tocopy2 = src->used - copied;
+			if (tocopy2 > strlen(p))
+				tocopy2 = strlen(p);
 			buffer_append_string_len(b, p, tocopy2);
 			copied += tocopy2;
 		}
 	}
+	if (b->used > 0) {
+		char *p = buffer_get_byte_addr(b, b->used-1);
+		*p = '\0';
+	}
+	dump_buffer(b);
 }
 
 void buffer_append_uint_hex(buffer *b, uintmax_t value) {
@@ -353,7 +391,6 @@ void buffer_append_uint_hex(buffer *b, uintmax_t value) {
 			shift += 2; /* counting nibbles (4 bits) */
 		} while (0 != copy);
 	}
-
 	buf = buffer_string_prepare_append(b, shift);
 	size_t space = buffer_get_contigous_space(b->used - 1);
 //	buffer_commit(b, shift); /* will fill below */
@@ -437,7 +474,6 @@ void buffer_append_strftime(buffer *b, const char *format, const struct tm *tm) 
 		buffer_string_prepare_append(b, 0);
 		return;
 	}
-
 	buf = buffer_string_prepare_append(b, 255);
 	size_t space = buffer_get_contigous_space(b->used - 1);
 	r = strftime(buf, space, format, tm);
@@ -585,18 +621,19 @@ int buffer_is_equal_string(const buffer *a, const char *s, size_t b_len) {
 	force_assert(b_len + 1 > b_len);
 
 	if (a->used != b_len + 1) return 0;
-	while(compared < a->used) {
+	while(compared < b_len) {
 		size_t tocompare = ((a->used - compared) > 1448) ? a->used - compared : 1448;
+		if (tocompare > (b_len - compared))
+			tocompare = b_len - compared;
 		char *p = buffer_get_byte_addr(a, compared);
-
-		if (memcmp(p, s, tocompare))
+		if (memcmp(p, s + compared, tocompare)) {
 			break;
+		}
 		compared += tocompare;
 		s += tocompare;
 	}
 	char *p = buffer_get_byte_addr(a, a->used - 1);
 	if ('\0' != *p) return 0;
-
 	return (compared == b_len);
 }
 
@@ -604,6 +641,7 @@ int buffer_is_equal_string(const buffer *a, const char *s, size_t b_len) {
 int buffer_is_equal_caseless_string(const buffer *a, const char *s, size_t b_len) {
 	size_t compared = 0;
 	force_assert(NULL != a);
+
 	if (a->used != b_len + 1) return 0;
 	force_assert('\0' == a->ptr[a->used - 1]);
 

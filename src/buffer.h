@@ -191,12 +191,14 @@ static inline size_t buffer_string_space(const buffer *b) {
 	return b->size - b->used;
 }
 
-static inline void buffer_append_slash(buffer *b) {
-	size_t len = buffer_string_length(b);
-	if (len > 0 && '/' != b->ptr[len-1]) BUFFER_APPEND_STRING_CONST(b, "/");
-}
-
 char *buffer_get_byte_addr(const buffer *b, int idx);
 size_t buffer_get_contigous_space(int idx);
+
+static inline void buffer_append_slash(buffer *b) {
+	size_t len = buffer_string_length(b);
+	char *p = buffer_get_byte_addr(b, len- 1);
+	if (len > 0 && '/' != *p) BUFFER_APPEND_STRING_CONST(b, "/");
+}
+
 
 #endif
