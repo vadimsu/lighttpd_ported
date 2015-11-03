@@ -215,7 +215,12 @@ void buffer_commit(buffer *b, size_t size)
 	force_assert(NULL != b);
 	force_assert(b->size > 0);
 
-	if (0 == b->used) b->used = 1;
+	if (0 == b->used) {
+		ipaugenblick_set_buffer_data_len(
+					b->bufs_and_desc[0].pdesc,
+					1);
+		b->used = 1;
+	}
 
 	if (size > 0) {
 		/* check for overflow: unsigned overflow is defined to wrap around */
