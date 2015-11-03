@@ -1182,7 +1182,7 @@ static void buffer_urldecode_internal(buffer *url, int is_query) {
 	}
 
 	*dst = '\0';
-	url->used = dst_idx + 1;
+	url->used = dst_idx;
 }
 
 void buffer_urldecode_path(buffer *url) {
