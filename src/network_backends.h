@@ -60,6 +60,7 @@
  */
 
 int network_write_chunkqueue_write(server *srv, connection *con, int fd, chunkqueue *cq, off_t max_bytes);
+int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, chunkqueue *cq, off_t max_bytes);
 
 #if defined(USE_WRITEV)
 int network_write_chunkqueue_writev(server *srv, connection *con, int fd, chunkqueue *cq, off_t max_bytes); /* fallback to write */

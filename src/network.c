@@ -522,6 +522,7 @@ typedef enum {
 	NETWORK_BACKEND_WRITE,
 	NETWORK_BACKEND_WRITEV,
 	NETWORK_BACKEND_SENDFILE,
+	NETWORK_BACKEND_IPAUGENBLICK
 } network_backend_t;
 
 #ifdef USE_OPENSSL
@@ -692,6 +693,7 @@ int network_init(server *srv) {
 		{ NETWORK_BACKEND_WRITEV,     "writev" },
 #endif
 		{ NETWORK_BACKEND_WRITE,      "write" },
+		{ NETWORK_BACKEND_IPAUGENBLICK, "ipaugenblick" },
 		{ NETWORK_BACKEND_UNSET,       NULL }
 	};
 
@@ -981,6 +983,9 @@ int network_init(server *srv) {
 		srv->network_backend_write = network_write_chunkqueue_sendfile;
 		break;
 #endif
+	case NETWORK_BACKEND_IPAUGENBLICK:
+		srv->network_backend_write = network_ipaugenblick_chunkqueue_write;
+		break;
 	default:
 		return -1;
 	}

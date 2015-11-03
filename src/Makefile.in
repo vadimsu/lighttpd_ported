@@ -154,7 +154,7 @@ am__liblightcomp_la_SOURCES_DIST = buffer.c log.c keyvalue.c chunk.c \
 	fdevent_linux_sysepoll.c fdevent_solaris_devpoll.c \
 	fdevent_solaris_port.c fdevent_freebsd_kqueue.c data_config.c \
 	inet_ntop_cache.c crc32.c connections-glue.c configfile-glue.c \
-	http-header-glue.c network_write.c network_linux_sendfile.c \
+	http-header-glue.c network_write.c network_linux_sendfile.c network_write_ipaugenblick.c \
 	network_write_mmap.c network_write_no_mmap.c \
 	network_freebsd_sendfile.c network_writev.c \
 	network_solaris_sendfilev.c network_openssl.c splaytree.c \
@@ -184,6 +184,7 @@ am__objects_1 = liblightcomp_la-buffer.lo liblightcomp_la-log.lo \
 	liblightcomp_la-network_linux_sendfile.lo \
 	liblightcomp_la-network_write_mmap.lo \
 	liblightcomp_la-network_write_no_mmap.lo \
+	liblightcomp_la-network_write_ipaugenblick.lo \
 	liblightcomp_la-network_freebsd_sendfile.lo \
 	liblightcomp_la-network_writev.lo \
 	liblightcomp_la-network_solaris_sendfilev.lo \
@@ -440,7 +441,7 @@ am__lighttpd_SOURCES_DIST = server.c response.c connections.c \
 	fdevent_linux_sysepoll.c fdevent_solaris_devpoll.c \
 	fdevent_solaris_port.c fdevent_freebsd_kqueue.c data_config.c \
 	inet_ntop_cache.c crc32.c connections-glue.c configfile-glue.c \
-	http-header-glue.c network_write.c network_linux_sendfile.c \
+	http-header-glue.c network_write.c network_linux_sendfile.c network_write_ipaugenblick.c \
 	network_write_mmap.c network_write_no_mmap.c \
 	network_freebsd_sendfile.c network_writev.c \
 	network_solaris_sendfilev.c network_openssl.c splaytree.c \
@@ -461,7 +462,7 @@ am__objects_2 = buffer.$(OBJEXT) log.$(OBJEXT) keyvalue.$(OBJEXT) \
 	connections-glue.$(OBJEXT) configfile-glue.$(OBJEXT) \
 	http-header-glue.$(OBJEXT) network_write.$(OBJEXT) \
 	network_linux_sendfile.$(OBJEXT) network_write_mmap.$(OBJEXT) \
-	network_write_no_mmap.$(OBJEXT) \
+	network_write_no_mmap.$(OBJEXT) network_write_ipaugenblick.$(OBJEXT) \
 	network_freebsd_sendfile.$(OBJEXT) network_writev.$(OBJEXT) \
 	network_solaris_sendfilev.$(OBJEXT) network_openssl.$(OBJEXT) \
 	splaytree.$(OBJEXT) status_counter.$(OBJEXT)
@@ -758,7 +759,7 @@ common_src = buffer.c log.c \
 	connections-glue.c \
 	configfile-glue.c \
 	http-header-glue.c \
-	network_write.c network_linux_sendfile.c \
+	network_write.c network_linux_sendfile.c network_write_ipaugenblick.c \
 	network_write_mmap.c network_write_no_mmap.c \
 	network_freebsd_sendfile.c network_writev.c \
 	network_solaris_sendfilev.c network_openssl.c \
@@ -1243,6 +1244,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/liblightcomp_la-network_openssl.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/liblightcomp_la-network_solaris_sendfilev.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/liblightcomp_la-network_write.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/liblightcomp_la-network_write_ipaugenblick.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/liblightcomp_la-network_write_mmap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/liblightcomp_la-network_write_no_mmap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/liblightcomp_la-network_writev.Plo@am__quote@
@@ -1297,6 +1299,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/network_openssl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/network_solaris_sendfilev.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/network_write.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/network_write_ipaugenblick.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/network_write_mmap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/network_write_no_mmap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/network_writev.Po@am__quote@
@@ -1556,6 +1559,13 @@ liblightcomp_la-network_write.lo: network_write.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='network_write.c' object='liblightcomp_la-network_write.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(liblightcomp_la_CFLAGS) $(CFLAGS) -c -o liblightcomp_la-network_write.lo `test -f 'network_write.c' || echo '$(srcdir)/'`network_write.c
+
+liblightcomp_la-network_write_ipaugenblick.lo: network_write_ipaugenblick.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(liblightcomp_la_CFLAGS) $(CFLAGS) -MT liblightcomp_la-network_write_ipaugenblick.lo -MD -MP -MF $(DEPDIR)/liblightcomp_la-network_write_ipaugenblick.Tpo -c -o liblightcomp_la-network_write_ipaugenblick.lo `test -f 'network_write_ipaugenblick.c' || echo '$(srcdir)/'`network_write_ipaugenblick.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/liblightcomp_la-network_write_ipaugenblick.Tpo $(DEPDIR)/liblightcomp_la-network_write_ipaugenblick.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='network_write_ipaugenblick.c' object='liblightcomp_la-network_write_ipaugenblick.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(liblightcomp_la_CFLAGS) $(CFLAGS) -c -o liblightcomp_la-network_write.lo `test -f 'network_write_ipaugenblick.c' || echo '$(srcdir)/'`network_write_ipaugenblick.c
 
 liblightcomp_la-network_linux_sendfile.lo: network_linux_sendfile.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(liblightcomp_la_CFLAGS) $(CFLAGS) -MT liblightcomp_la-network_linux_sendfile.lo -MD -MP -MF $(DEPDIR)/liblightcomp_la-network_linux_sendfile.Tpo -c -o liblightcomp_la-network_linux_sendfile.lo `test -f 'network_linux_sendfile.c' || echo '$(srcdir)/'`network_linux_sendfile.c
