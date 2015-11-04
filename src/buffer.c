@@ -1102,8 +1102,13 @@ void buffer_copy_string_encoded_cgi_varnames(buffer *b, const char *s, size_t s_
 
 	j = buffer_string_length(b);
 	char *p = buffer_get_byte_addr(b, j);
-	if (buffer_get_contigous_space(j) == 0)
+	if (buffer_get_contigous_space(j) == 0) {
 		p = buffer_get_byte_addr(b, ++j);
+		ipaugenblick_set_buffer_data_len(
+				b->bufs_and_desc[j/1448].pdesc,
+				ipaugenblick_get_buffer_data_len(
+				b->bufs_and_desc[j/1448].pdesc)+1);
+	}
 	for (i = 0; i < s_len; ++i) {
 		unsigned char cr = s[i];	
 		if (light_isalpha(cr)) {
@@ -1120,6 +1125,10 @@ void buffer_copy_string_encoded_cgi_varnames(buffer *b, const char *s, size_t s_
 	b->used = j+1;
 	p = buffer_get_byte_addr(b, j);
 	*p = '\0';
+	ipaugenblick_set_buffer_data_len(
+				b->bufs_and_desc[j/1448].pdesc,
+				ipaugenblick_get_buffer_data_len(
+				b->bufs_and_desc[j/1448].pdesc)+1);
 }
 
 /* decodes url-special-chars inplace.
@@ -1130,6 +1139,7 @@ static void buffer_urldecode_internal(buffer *url, int is_query) {
 	unsigned char high, low;
 	char *src;
 	char *dst;
+	int delta = 0;
 
 	force_assert(NULL != url);
 	if (buffer_string_is_empty(url)) return;
@@ -1183,11 +1193,16 @@ static void buffer_urldecode_internal(buffer *url, int is_query) {
 		} else
 			dst++;
 			dst_idx++;
+			delta++;
 		}
 	}
 
 	*dst = '\0';
 	url->used = dst_idx;
+	ipaugenblick_set_buffer_data_len(
+				url->bufs_and_desc[dst_idx].pdesc,
+				ipaugenblick_get_buffer_data_len(
+				url->bufs_and_desc[dst_idx].pdesc)+delta);
 }
 
 void buffer_urldecode_path(buffer *url) {

@@ -1,8 +1,8 @@
-#! /bin/sh
+#! /bin/bash
 
 # libtool - Provide generalized library-building support services.
 # Generated automatically by config.status (lighttpd) 1.4.37
-# Libtool was configured on host localhost.localdomain:
+# Libtool was configured on host ourlab:
 # NOTE: Changes made to this file will be lost: look at ltmain.sh.
 #
 #   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005,
@@ -40,22 +40,22 @@ available_tags=""
 # ### BEGIN LIBTOOL CONFIG
 
 # A sed program that does not truncate output.
-SED="/usr/bin/sed"
+SED="/bin/sed"
 
 # Sed that helps us avoid accidentally triggering echo(1) options like -n.
 Xsed="$SED -e 1s/^X//"
 
 # A grep program that handles long lines.
-GREP="/usr/bin/grep"
+GREP="/bin/grep"
 
 # An ERE matcher.
-EGREP="/usr/bin/grep -E"
+EGREP="/bin/grep -E"
 
 # A literal string matcher.
-FGREP="/usr/bin/grep -F"
+FGREP="/bin/grep -F"
 
 # Shell to use when invoking shell scripts.
-SHELL="/bin/sh"
+SHELL="/bin/bash"
 
 # An echo program that protects backslashes.
 ECHO="printf %s\\n"
@@ -272,10 +272,10 @@ finish_eval=""
 hardcode_into_libs=yes
 
 # Compile-time system search path for libraries.
-sys_lib_search_path_spec="/usr/lib/gcc/x86_64-redhat-linux/4.8.3 /usr/lib64 /lib64 "
+sys_lib_search_path_spec="/usr/lib/gcc/x86_64-linux-gnu/4.8 /usr/lib/x86_64-linux-gnu /usr/lib /lib/x86_64-linux-gnu /lib "
 
 # Run-time system search path for libraries.
-sys_lib_dlsearch_path_spec="/lib /usr/lib /usr/lib64/iscsi /usr/lib64/llvm /usr/lib64/tracker-0.16 /usr/lib64/xulrunner "
+sys_lib_dlsearch_path_spec="/lib /usr/lib /usr/local/lib /lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu/mesa-egl /usr/lib/x86_64-linux-gnu/mesa /usr/lib/ipaugenblick "
 
 # Whether dlopen is supported.
 dlopen_support=yes
@@ -284,7 +284,7 @@ dlopen_support=yes
 dlopen_self=yes
 
 # Whether dlopen of statically linked programs is supported.
-dlopen_self_static=yes
+dlopen_self_static=no
 
 # Commands to strip libraries.
 old_striplib="strip --strip-debug"
@@ -317,7 +317,7 @@ pic_flag=" -fPIC -DPIC"
 wl="-Wl,"
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag=""
+link_static_flag="-static"
 
 # Does compiler simultaneously support -c and -o options?
 compiler_c_o="yes"

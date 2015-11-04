@@ -575,7 +575,7 @@ void chunkqueue_mark_written(chunkqueue *cq, off_t len) {
 	force_assert(len >= 0);
 
 	for (c = cq->first; NULL != c; c = cq->first) {
-		off_t c_len = chunk_remaining_length(c);
+		off_t c_len = chunk_remaining_length(c) + 1;
 
 		if (0 == written && 0 != c_len) break; /* no more finished chunks */
 

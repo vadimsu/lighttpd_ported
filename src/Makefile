@@ -151,7 +151,7 @@ am__liblightcomp_la_SOURCES_DIST = buffer.c log.c keyvalue.c chunk.c \
 	joblist.c etag.c array.c data_string.c data_count.c \
 	data_array.c data_integer.c md5.c data_fastcgi.c \
 	fdevent_select.c fdevent_libev.c fdevent_poll.c \
-	fdevent_linux_sysepoll.c fdevent_solaris_devpoll.c \
+	fdevent_linux_sysepoll.c fdevent_solaris_devpoll.c fdevent_ipaugenblick.c \
 	fdevent_solaris_port.c fdevent_freebsd_kqueue.c data_config.c \
 	inet_ntop_cache.c crc32.c connections-glue.c configfile-glue.c \
 	http-header-glue.c network_write.c network_linux_sendfile.c \
@@ -175,6 +175,7 @@ am__objects_1 = liblightcomp_la-buffer.lo liblightcomp_la-log.lo \
 	liblightcomp_la-fdevent_solaris_devpoll.lo \
 	liblightcomp_la-fdevent_solaris_port.lo \
 	liblightcomp_la-fdevent_freebsd_kqueue.lo \
+	liblightcomp_la-fdevent_ipaugenblick.lo \
 	liblightcomp_la-data_config.lo \
 	liblightcomp_la-inet_ntop_cache.lo liblightcomp_la-crc32.lo \
 	liblightcomp_la-connections-glue.lo \
@@ -437,7 +438,7 @@ am__lighttpd_SOURCES_DIST = server.c response.c connections.c \
 	fdevent.c stat_cache.c plugin.c joblist.c etag.c array.c \
 	data_string.c data_count.c data_array.c data_integer.c md5.c \
 	data_fastcgi.c fdevent_select.c fdevent_libev.c fdevent_poll.c \
-	fdevent_linux_sysepoll.c fdevent_solaris_devpoll.c \
+	fdevent_linux_sysepoll.c fdevent_solaris_devpoll.c fdevent_ipaugenblick.c \
 	fdevent_solaris_port.c fdevent_freebsd_kqueue.c data_config.c \
 	inet_ntop_cache.c crc32.c connections-glue.c configfile-glue.c \
 	http-header-glue.c network_write.c network_linux_sendfile.c \
@@ -456,6 +457,7 @@ am__objects_2 = buffer.$(OBJEXT) log.$(OBJEXT) keyvalue.$(OBJEXT) \
 	fdevent_linux_sysepoll.$(OBJEXT) \
 	fdevent_solaris_devpoll.$(OBJEXT) \
 	fdevent_solaris_port.$(OBJEXT) \
+	fdevent_ipaugenblick.$(OBJEXT) \
 	fdevent_freebsd_kqueue.$(OBJEXT) data_config.$(OBJEXT) \
 	inet_ntop_cache.$(OBJEXT) crc32.$(OBJEXT) \
 	connections-glue.$(OBJEXT) configfile-glue.$(OBJEXT) \
@@ -585,14 +587,14 @@ ETAGS = etags
 CTAGS = ctags
 am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/vsuraev/lighttpd-1.4.37/missing aclocal-1.15
+ACLOCAL = ${SHELL} /home/vadim/lighttpd-1.4.37_dpdk/lighttpd-1.4.37/missing aclocal-1.15
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
 AR = ar
 ATTR_LIB = 
-AUTOCONF = ${SHELL} /home/vsuraev/lighttpd-1.4.37/missing autoconf
-AUTOHEADER = ${SHELL} /home/vsuraev/lighttpd-1.4.37/missing autoheader
-AUTOMAKE = ${SHELL} /home/vsuraev/lighttpd-1.4.37/missing automake-1.15
+AUTOCONF = ${SHELL} /home/vadim/lighttpd-1.4.37_dpdk/lighttpd-1.4.37/missing autoconf
+AUTOHEADER = ${SHELL} /home/vadim/lighttpd-1.4.37_dpdk/lighttpd-1.4.37/missing autoheader
+AUTOMAKE = ${SHELL} /home/vadim/lighttpd-1.4.37_dpdk/lighttpd-1.4.37/missing automake-1.15
 AWK = gawk
 BZ_LIB = -lbz2
 CC = gcc
@@ -611,13 +613,13 @@ DUMPBIN =
 ECHO_C = 
 ECHO_N = -n
 ECHO_T = 
-EGREP = /usr/bin/grep -E
+EGREP = /bin/grep -E
 EXEEXT = 
 FAM_CFLAGS = 
 FAM_LIBS = 
-FGREP = /usr/bin/grep -F
+FGREP = /bin/grep -F
 GDBM_LIB = 
-GREP = /usr/bin/grep
+GREP = /bin/grep
 INSTALL = /usr/bin/install -c
 INSTALL_DATA = ${INSTALL} -m 644
 INSTALL_PROGRAM = ${INSTALL}
@@ -626,11 +628,11 @@ INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
 LBER_LIB = 
 LD = /usr/bin/ld -m elf_x86_64
 LDAP_LIB = 
-LDFLAGS = 
+LDFLAGS = -L/usr/lib/ipaugenblick  
 LIBEV_CFLAGS = 
 LIBEV_LIBS = 
 LIBOBJS = 
-LIBS = 
+LIBS = -lrt -ldl -lipaugenblickservice -lrte_eal -lrte_ring -lrte_timer -lrte_mempool -lrte_malloc -lrte_mbuf -lrt -ldl -pthread  
 LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LIBUNWIND_CFLAGS = 
 LIBUNWIND_LIBS = 
@@ -639,10 +641,10 @@ LN_S = ln -s
 LTLIBOBJS = 
 LUA_CFLAGS = 
 LUA_LIBS = 
-MAKEINFO = ${SHELL} /home/vsuraev/lighttpd-1.4.37/missing makeinfo
+MAKEINFO = ${SHELL} /home/vadim/lighttpd-1.4.37_dpdk/lighttpd-1.4.37/missing makeinfo
 MANIFEST_TOOL = :
 MEMCACHE_LIB = 
-MKDIR_P = /usr/bin/mkdir -p
+MKDIR_P = /bin/mkdir -p
 MYSQL_CONFIG = 
 MYSQL_INCLUDE = 
 MYSQL_LIBS = 
@@ -666,10 +668,10 @@ PKG_CONFIG = /usr/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
 PKG_CONFIG_PATH = 
 RANLIB = ranlib
-SED = /usr/bin/sed
+SED = /bin/sed
 SENDFILE_LIB = 
 SET_MAKE = 
-SHELL = /bin/sh
+SHELL = /bin/bash
 SQLITE_CFLAGS = 
 SQLITE_LIBS = 
 SSL_LIB = 
@@ -679,10 +681,10 @@ VERSION = 1.4.37
 XML_CFLAGS = 
 XML_LIBS = 
 Z_LIB = -lz
-abs_builddir = /home/vsuraev/lighttpd-1.4.37/src
-abs_srcdir = /home/vsuraev/lighttpd-1.4.37/src
-abs_top_builddir = /home/vsuraev/lighttpd-1.4.37
-abs_top_srcdir = /home/vsuraev/lighttpd-1.4.37
+abs_builddir = /home/vadim/lighttpd-1.4.37_dpdk/lighttpd-1.4.37/src
+abs_srcdir = /home/vadim/lighttpd-1.4.37_dpdk/lighttpd-1.4.37/src
+abs_top_builddir = /home/vadim/lighttpd-1.4.37_dpdk/lighttpd-1.4.37
+abs_top_srcdir = /home/vadim/lighttpd-1.4.37_dpdk/lighttpd-1.4.37
 ac_ct_AR = ar
 ac_ct_CC = gcc
 ac_ct_DUMPBIN = 
@@ -711,7 +713,7 @@ host_vendor = unknown
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/vsuraev/lighttpd-1.4.37/install-sh
+install_sh = ${SHELL} /home/vadim/lighttpd-1.4.37_dpdk/lighttpd-1.4.37/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale

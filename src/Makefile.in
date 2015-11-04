@@ -151,7 +151,7 @@ am__liblightcomp_la_SOURCES_DIST = buffer.c log.c keyvalue.c chunk.c \
 	joblist.c etag.c array.c data_string.c data_count.c \
 	data_array.c data_integer.c md5.c data_fastcgi.c \
 	fdevent_select.c fdevent_libev.c fdevent_poll.c \
-	fdevent_linux_sysepoll.c fdevent_solaris_devpoll.c \
+	fdevent_linux_sysepoll.c fdevent_solaris_devpoll.c fdevent_ipaugenblick.c \
 	fdevent_solaris_port.c fdevent_freebsd_kqueue.c data_config.c \
 	inet_ntop_cache.c crc32.c connections-glue.c configfile-glue.c \
 	http-header-glue.c network_write.c network_linux_sendfile.c network_write_ipaugenblick.c \
@@ -175,6 +175,7 @@ am__objects_1 = liblightcomp_la-buffer.lo liblightcomp_la-log.lo \
 	liblightcomp_la-fdevent_solaris_devpoll.lo \
 	liblightcomp_la-fdevent_solaris_port.lo \
 	liblightcomp_la-fdevent_freebsd_kqueue.lo \
+	liblightcomp_la-fdevent_ipaugenblick.lo \
 	liblightcomp_la-data_config.lo \
 	liblightcomp_la-inet_ntop_cache.lo liblightcomp_la-crc32.lo \
 	liblightcomp_la-connections-glue.lo \
@@ -438,7 +439,7 @@ am__lighttpd_SOURCES_DIST = server.c response.c connections.c \
 	fdevent.c stat_cache.c plugin.c joblist.c etag.c array.c \
 	data_string.c data_count.c data_array.c data_integer.c md5.c \
 	data_fastcgi.c fdevent_select.c fdevent_libev.c fdevent_poll.c \
-	fdevent_linux_sysepoll.c fdevent_solaris_devpoll.c \
+	fdevent_linux_sysepoll.c fdevent_solaris_devpoll.c fdevent_ipaugenblick.c \
 	fdevent_solaris_port.c fdevent_freebsd_kqueue.c data_config.c \
 	inet_ntop_cache.c crc32.c connections-glue.c configfile-glue.c \
 	http-header-glue.c network_write.c network_linux_sendfile.c network_write_ipaugenblick.c \
@@ -457,6 +458,7 @@ am__objects_2 = buffer.$(OBJEXT) log.$(OBJEXT) keyvalue.$(OBJEXT) \
 	fdevent_linux_sysepoll.$(OBJEXT) \
 	fdevent_solaris_devpoll.$(OBJEXT) \
 	fdevent_solaris_port.$(OBJEXT) \
+	fdevent_ipaugenblick.$(OBJEXT) \
 	fdevent_freebsd_kqueue.$(OBJEXT) data_config.$(OBJEXT) \
 	inet_ntop_cache.$(OBJEXT) crc32.$(OBJEXT) \
 	connections-glue.$(OBJEXT) configfile-glue.$(OBJEXT) \
