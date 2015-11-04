@@ -38,6 +38,7 @@ int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, 
 		/* VADIM TODO: imcrement refcnt??? */
 			offsets[j] = c->offset;
 			lengths[j] = ipaugenblick_get_buffer_data_len(c->mem->bufs_and_desc[j].pdesc);
+			ipaugenblick_update_rfc(c->mem->bufs_and_desc[j].pdesc, 1);
 		}
 		ipaugenblick_send_bulk(fd, c->mem->bufs_and_desc, offsets, lengths, c->mem->buffers_count);
 		while(ipaugenblick_socket_kick(fd) != 0);

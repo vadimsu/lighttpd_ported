@@ -72,18 +72,18 @@ void buffer_reset(buffer *b) {
 	if (NULL == b) return;
 
 	/* limit don't reuse buffer larger than ... bytes */
-#if 0 /* VADIM - FIXME */
-	if (b->size > BUFFER_MAX_REUSE_SIZE) {
-		free(b->ptr);
-		b->ptr = NULL;
-		b->size = 0;
-	} else 
-#endif
-		if (b->size > 0) {
-		b->ptr[0] = '\0';
-	}
+	int idx;
 
+	for(idx = 0; idx < b->buffers_count; idx++)
+		ipaugenblick_release_tx_buffer(b->bufs_and_desc[idx].pdesc);
+	b->ptr = NULL;
+	b->size = 0;
 	b->used = 0;
+	if (b->bufs_and_desc) {
+		free(b->bufs_and_desc);
+		b->bufs_and_desc = NULL;
+	}
+	b->buffers_count = 0;
 }
 
 char *buffer_get_byte_addr(const buffer *b, int idx)
