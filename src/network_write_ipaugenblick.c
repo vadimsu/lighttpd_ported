@@ -60,7 +60,9 @@ int network_ipaugenblick_file_chunk(server *srv, connection *con, int fd, chunkq
 	}
 
 	ipaugenblick_send_bulk(fd, bufs_and_desc, offsets, lengths, buffers_count);
+	printf("%s %d\n",__FILE__,__LINE__);
 	while(ipaugenblick_socket_kick(fd) != 0);
+	printf("%s %d\n",__FILE__,__LINE__);
 	chunkqueue_mark_written(cq, toSend);
 
 	return 0;
@@ -71,9 +73,9 @@ int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, 
 	chunk* next;
 	chunk* c = cq->first;
 	while (max_bytes > 0 && c) {
-
-		switch (cq->first->type) {
-		case MEM_CHUNK:
+		next = c->next;
+		switch (/*cq->first*/c->type) {
+		case MEM_CHUNK:	
 			max_bytes -= c->mem->used;
 			{
 				int offsets[c->mem->buffers_count];
@@ -84,15 +86,18 @@ int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, 
 					ipaugenblick_update_rfc(c->mem->bufs_and_desc[i].pdesc, 1);
 				}
 				ipaugenblick_send_bulk(fd, c->mem->bufs_and_desc, offsets, lengths, c->mem->buffers_count);
+				printf("%s %d\n",__FILE__,__LINE__);
 				while(ipaugenblick_socket_kick(fd) != 0);
+				printf("%s %d\n",__FILE__,__LINE__);
 				chunkqueue_mark_written(cq, c->mem->used);
 			}
 			break;
 		case FILE_CHUNK:
+			printf("%s %d\n",__FILE__,__LINE__);
 			network_ipaugenblick_file_chunk(srv, con, fd, cq, &max_bytes);
 			break;
 		}
-		c = c->next;
+		c = next;
 	}	
 	return 0;
 }
