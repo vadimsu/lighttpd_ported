@@ -101,3 +101,7 @@ int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, 
 	}	
 	return 0;
 }
+
+void network_ipaugenblick_readall(int fd)
+{
+}

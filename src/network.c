@@ -1109,3 +1109,21 @@ int network_write_chunkqueue(server *srv, connection *con, chunkqueue *cq, off_t
 
 	return ret;
 }
+
+void network_flush_rx(server *srv, connection *con)
+{
+#if 1
+	network_ipaugenblick_readall(con->fd);
+	con->close_timeout_ts = srv->cur_ts - (HTTP_LINGER_TIMEOUT+1);
+#else
+	{
+		int len;
+		char buf[1024];
+
+		len = read(con->fd, buf, sizeof(buf));
+		if (len == 0 || (len < 0 && errno != EAGAIN && errno != EINTR) ) {
+			con->close_timeout_ts = srv->cur_ts - (HTTP_LINGER_TIMEOUT+1);
+		}
+	}
+#endif
+}

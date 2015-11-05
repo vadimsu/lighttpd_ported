@@ -1369,6 +1369,7 @@ int connection_state_machine(server *srv, connection *con) {
 			 * still have unread data, and closing before reading
 			 * it will make the client not see all our output.
 			 */
+#if 0
 			{
 				int len;
 				char buf[1024];
@@ -1378,6 +1379,9 @@ int connection_state_machine(server *srv, connection *con) {
 					con->close_timeout_ts = srv->cur_ts - (HTTP_LINGER_TIMEOUT+1);
 				}
 			}
+#else
+			network_flush_rx(srv, con);
+#endif
 
 			if (srv->cur_ts - con->close_timeout_ts > HTTP_LINGER_TIMEOUT) {
 				connection_close(srv, con);
