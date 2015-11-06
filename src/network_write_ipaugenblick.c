@@ -15,6 +15,7 @@ int network_ipaugenblick_file_chunk(server *srv, connection *con, int fd, chunkq
 	chunk* const c = cq->first;
 	off_t offset, toSend;
 	ssize_t r;
+	int rc;
 
 	force_assert(NULL != c);
 	force_assert(FILE_CHUNK == c->type);
@@ -59,17 +60,16 @@ int network_ipaugenblick_file_chunk(server *srv, connection *con, int fd, chunkq
 		toSend -= toRead;
 	}
 
-	ipaugenblick_send_bulk(fd, bufs_and_desc, offsets, lengths, buffers_count);
-	printf("%s %d\n",__FILE__,__LINE__);
+	rc = ipaugenblick_send_bulk(fd, bufs_and_desc, offsets, lengths, buffers_count);
 	while(ipaugenblick_socket_kick(fd) != 0);
-	printf("%s %d\n",__FILE__,__LINE__);
-	chunkqueue_mark_written(cq, toSend);
+	if (!rc)
+		chunkqueue_mark_written(cq, toSend);
 
-	return 0;
+	return rc;
 }
 
 int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, chunkqueue *cq, off_t max_bytes) {
-	int buffer_count = 0, i;
+	int buffer_count = 0, i, rc;
 	chunk* next;
 	chunk* c = cq->first;
 	while (max_bytes > 0 && c) {
@@ -85,21 +85,23 @@ int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, 
 					lengths[i] = ipaugenblick_get_buffer_data_len(c->mem->bufs_and_desc[i].pdesc);
 					ipaugenblick_update_rfc(c->mem->bufs_and_desc[i].pdesc, 1);
 				}
-				ipaugenblick_send_bulk(fd, c->mem->bufs_and_desc, offsets, lengths, c->mem->buffers_count);
-				printf("%s %d\n",__FILE__,__LINE__);
+				rc = ipaugenblick_send_bulk(fd, c->mem->bufs_and_desc, offsets, lengths, c->mem->buffers_count);
 				while(ipaugenblick_socket_kick(fd) != 0);
-				printf("%s %d\n",__FILE__,__LINE__);
-				chunkqueue_mark_written(cq, c->mem->used);
+				if (rc)
+					next = NULL;/* force exit loop */
+				else
+					chunkqueue_mark_written(cq, c->mem->used);
 			}
 			break;
 		case FILE_CHUNK:
-			printf("%s %d\n",__FILE__,__LINE__);
-			network_ipaugenblick_file_chunk(srv, con, fd, cq, &max_bytes);
+			rc = network_ipaugenblick_file_chunk(srv, con, fd, cq, &max_bytes);
+			if (rc)
+				next = NULL;/* force exit loop */
 			break;
 		}
 		c = next;
 	}	
-	return 0;
+	return rc;
 }
 
 void network_ipaugenblick_readall(int fd)

@@ -51,7 +51,6 @@ static int fdevent_ipaugenblick_poll(fdevents *ev, int timeout_ms) {
 		for(i = 0;i < ev->readfdset.returned_idx;i++) {
 			int sock = ipaugenblick_fd_idx2sock(&ev->readfdset,i);
 			ev->fdarray[sock]->events = FDEVENT_IN;
-			printf("%s %d\n",__FILE__,__LINE__);
 			ev->ipaugenblick_events[event_idx++] = sock;
 		}
 		for(i = 0;i < ev->writefdset.returned_idx;i++) {

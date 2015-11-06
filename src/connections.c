@@ -351,7 +351,7 @@ static int connection_handle_read(server *srv, connection *con) {
 			chunkqueue_append_buffer(con->read_queue,b);
 			chunkqueue_use_memory(con->read_queue, segment_len);
 			con->bytes_read += len;
-                        rxbuff = ipaugenblick_get_next_buffer_segment(&pdesc,&segment_len);
+                        rxbuff = ipaugenblick_get_next_buffer_segment_and_detach_first(&pdesc,&segment_len);
                 }
 	} while(1);
 #endif /* __WIN32 */	
