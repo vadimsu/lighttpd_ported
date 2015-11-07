@@ -286,7 +286,6 @@ static void buffer_copy_string_len_with_offset(buffer *b,
 						size_t s_len) {
 	force_assert(NULL != b);
 	force_assert(NULL != s || s_len == 0);
-//printf("%s %s\n",__func__,s);
 
 	size_t copied = 0;
 	while(copied < s_len) {
@@ -341,14 +340,11 @@ void buffer_append_string_len(buffer *b, const char *s, size_t s_len) {
 
 	force_assert(NULL != b);
 	force_assert(NULL != s || s_len == 0);
-
 	size_t copied = 0;
 	while(copied < s_len) {
 		target_buf = buffer_string_prepare_append(b, s_len - copied);
 		size_t space = buffer_get_contigous_space(b->used - 1);
 		int tocopy = ((s_len - copied) > space) ? space : s_len - copied;
-		if (tocopy > strlen(s+copied))
-			tocopy = strlen(s+copied);
 		memcpy(target_buf,s + copied, tocopy);
 		buffer_commit(b, tocopy);
 		copied += tocopy;
@@ -372,8 +368,9 @@ void buffer_append_string_buffer(buffer *b, const buffer *src) {
 			size_t tocopy2 = buffer_get_contigous_space(copied);
 			if ((tocopy2 + copied) > src->used)
 				tocopy2 = src->used - copied;
-			if (tocopy2 > strlen(p))
-				tocopy2 = strlen(p);
+			if (tocopy2 > tocopy)
+				tocopy2 = tocopy;
+
 			buffer_append_string_len(b, p, tocopy2);
 			copied += tocopy2;
 		}
