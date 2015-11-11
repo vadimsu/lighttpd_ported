@@ -1334,7 +1334,7 @@ int connection_state_machine(server *srv, connection *con) {
 					}
 				}
 #endif
-				if ((0 == shutdown(con->fd, SHUT_WR))) {
+				if ((0 == ipaugenblick_shutdown(con->fd, SHUT_WR))) {
 					con->close_timeout_ts = srv->cur_ts;
 					connection_set_state(srv, con, CON_STATE_CLOSE);
 				} else {
@@ -1506,9 +1506,8 @@ int connection_state_machine(server *srv, connection *con) {
 			}
 
 			connection_reset(srv, con);
-
 			/* close the connection */
-			if ((0 == shutdown(con->fd, SHUT_WR))) {
+			if ((0 == ipaugenblick_shutdown(con->fd, SHUT_WR))) {
 				con->close_timeout_ts = srv->cur_ts;
 				connection_set_state(srv, con, CON_STATE_CLOSE);
 
