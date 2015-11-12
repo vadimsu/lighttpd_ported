@@ -61,7 +61,6 @@ int network_ipaugenblick_file_chunk(server *srv, connection *con, int fd, chunkq
 	}
 
 	rc = ipaugenblick_send_bulk(fd, bufs_and_desc, offsets, lengths, buffers_count);
-	while(ipaugenblick_socket_kick(fd) != 0);
 	if (!rc)
 		chunkqueue_mark_written(cq, toSend);
 
@@ -85,8 +84,7 @@ int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, 
 					lengths[i] = ipaugenblick_get_buffer_data_len(c->mem->bufs_and_desc[i].pdesc);
 					ipaugenblick_update_rfc(c->mem->bufs_and_desc[i].pdesc, 1);
 				}
-				rc = ipaugenblick_send_bulk(fd, c->mem->bufs_and_desc, offsets, lengths, c->mem->buffers_count);
-				while(ipaugenblick_socket_kick(fd) != 0);
+				rc = ipaugenblick_send_bulk(fd, c->mem->bufs_and_desc, offsets, lengths, c->mem->buffers_count);	
 				if (rc)
 					next = NULL;/* force exit loop */
 				else
@@ -100,7 +98,8 @@ int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, 
 			break;
 		}
 		c = next;
-	}	
+	}
+	while(ipaugenblick_socket_kick(fd) != 0);
 	return rc;
 }
 

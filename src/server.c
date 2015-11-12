@@ -98,6 +98,9 @@ static void sigaction_handler(int sig, siginfo_t *si, void *context) {
 		srv_shutdown = 1;
 		last_sigterm_info = *si;
 		break;
+	case SIGABRT:
+		srv_shutdown = 1;
+		break;
 	case SIGINT:
 		if (graceful_shutdown) {
 			srv_shutdown = 1;
@@ -128,6 +131,12 @@ static void sigaction_handler(int sig, siginfo_t *si, void *context) {
 	case SIGCHLD:
 		break;
 	}
+	if(srv_shutdown) {
+		print_stats();
+		print_rings_stats();
+		print_stats();
+		print_rings_stats();
+	}
 }
 #elif defined(HAVE_SIGNAL) || defined(HAVE_SIGACTION)
 static void signal_handler(int sig) {
@@ -141,6 +150,11 @@ static void signal_handler(int sig) {
 	case SIGALRM: handle_sig_alarm = 1; break;
 	case SIGHUP:  handle_sig_hup = 1; break;
 	case SIGCHLD:  break;
+	case SIGABRT: srv_shutdown = 1; break;
+	}
+	if(srv_shutdown) {
+		print_stats();
+		print_rings_stats();
 	}
 }
 #endif
@@ -963,7 +977,7 @@ int main (int argc, char **argv) {
 	memset(&act, 0, sizeof(act));
 	act.sa_handler = SIG_IGN;
 	sigaction(SIGPIPE, &act, NULL);
-	sigaction(SIGUSR1, &act, NULL);
+//	sigaction(SIGUSR1, &act, NULL);
 # if defined(SA_SIGINFO)
 	act.sa_sigaction = sigaction_handler;
 	sigemptyset(&act.sa_mask);
@@ -978,11 +992,13 @@ int main (int argc, char **argv) {
 	sigaction(SIGHUP,  &act, NULL);
 	sigaction(SIGALRM, &act, NULL);
 	sigaction(SIGCHLD, &act, NULL);
+	sigaction(SIGABRT, &act, NULL);
+	sigaction(SIGSEGV, &act, NULL);
 
 #elif defined(HAVE_SIGNAL)
 	/* ignore the SIGPIPE from sendfile() */
 	signal(SIGPIPE, SIG_IGN);
-	signal(SIGUSR1, SIG_IGN);
+//	signal(SIGUSR1, SIG_IGN);
 	signal(SIGALRM, signal_handler);
 	signal(SIGTERM, signal_handler);
 	signal(SIGHUP,  signal_handler);
@@ -1291,7 +1307,6 @@ int main (int argc, char **argv) {
 					log_error_write(srv, __FILE__, __LINE__, "d", r);
 					break;
 				}
-
 				/* trigger waitpid */
 				srv->cur_ts = min_ts;
 

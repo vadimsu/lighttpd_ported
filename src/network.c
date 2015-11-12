@@ -274,6 +274,13 @@ static int network_server_init(server *srv, buffer *host_token, specific_config 
 		log_error_write(srv, __FILE__, __LINE__, "ss", "socketsockopt(SO_REUSEADDR) failed:", strerror(errno));
 		goto error_free_socket;
 	}
+	struct linger lg;
+	lg.l_onoff = 1;
+        lg.l_linger = 1;   /* how many seconds to linger for */
+	if (ipaugenblick_setsockopt(srv_socket->fd, SOL_SOCKET, SO_LINGER, &lg, sizeof(lg)) < 0) {
+		log_error_write(srv, __FILE__, __LINE__, "ss", "socketsockopt(SO_REUSEADDR) failed:", strerror(errno));
+		goto error_free_socket;
+	}
 
 	switch(srv_socket->addr.plain.sa_family) {
 #ifdef HAVE_IPV6
