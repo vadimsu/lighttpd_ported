@@ -13,7 +13,7 @@
 
 int network_ipaugenblick_file_chunk(server *srv, connection *con, int fd, chunkqueue *cq, off_t *p_max_bytes) {
 	chunk* const c = cq->first;
-	off_t offset, toSend;
+	off_t offset, toSend, toSend2;
 	ssize_t r;
 	int rc;
 
@@ -46,6 +46,7 @@ int network_ipaugenblick_file_chunk(server *srv, connection *con, int fd, chunkq
 		return -1;
 	}
 	int buf_idx = 0;
+	toSend2 = toSend;
 	while(toSend > 0) {
 		int toRead = (toSend > 1448) ? 1448 : toSend;
 		if (-1 == (toSend = read(c->file.fd, bufs_and_desc[buf_idx].pdata, toRead))) {
@@ -62,7 +63,7 @@ int network_ipaugenblick_file_chunk(server *srv, connection *con, int fd, chunkq
 
 	rc = ipaugenblick_send_bulk(fd, bufs_and_desc, offsets, lengths, buffers_count);
 	if (!rc)
-		chunkqueue_mark_written(cq, toSend);
+		chunkqueue_mark_written(cq, toSend2 - toSend);
 
 	return rc;
 }

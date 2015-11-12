@@ -1037,6 +1037,7 @@ static handler_t connection_handle_fdevent(server *srv, void *context, int reven
 
 	if (con->state == CON_STATE_CLOSE) {
 		/* flush the read buffers */
+#if 0 /* VADIM FIXME */
 		int len;
 		char buf[1024];
 
@@ -1044,6 +1045,10 @@ static handler_t connection_handle_fdevent(server *srv, void *context, int reven
 		if (len == 0 || (len < 0 && errno != EAGAIN && errno != EINTR) ) {
 			con->close_timeout_ts = srv->cur_ts - (HTTP_LINGER_TIMEOUT+1);
 		}
+#else
+		network_flush_rx(srv, con);
+		con->close_timeout_ts = srv->cur_ts - (HTTP_LINGER_TIMEOUT+1);
+#endif
 	}
 
 	return HANDLER_FINISHED;
