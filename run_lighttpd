@@ -1,0 +1,1 @@
+sudo LD_LIBRARY_PATH=:/usr/lib/ipaugenblick  SRCDIR= PERL= ./src/lighttpd -c 1 -n 1 --proc-type secondary --  -f ./tests/lighttpd.conf -D
