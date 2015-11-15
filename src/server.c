@@ -740,7 +740,8 @@ int main (int argc, char **argv) {
 	}
 #if 1 /* VADIM */
 	srv->event_handler = FDEVENT_HANDLER_IPAUGENBLICK;
-	printf("%s %d %d\n",__FILE__,__LINE__,srv->max_fds);
+	srv->max_fds = 0xFFFE;
+	srv->max_conns = srv->srvconf.max_conns = srv->max_fds;
 	if (NULL == (srv->ev = fdevent_init(srv, srv->max_fds + 1, srv->event_handler))) {
 		log_error_write(srv, __FILE__, __LINE__,
 				"s", "fdevent_init failed");
@@ -755,7 +756,7 @@ int main (int argc, char **argv) {
 #ifdef HAVE_VALGRIND_VALGRIND_H
 		if (RUNNING_ON_VALGRIND) use_rlimit = 0;
 #endif
-
+#if 0 /* VADIM - no limitation on max conn number */
 #ifdef HAVE_GETRLIMIT
 		if (0 != getrlimit(RLIMIT_NOFILE, &rlim)) {
 			log_error_write(srv, __FILE__, __LINE__,
@@ -830,6 +831,7 @@ int main (int argc, char **argv) {
 			}
 		}
 #endif
+#endif
 		/* we need root-perms for port < 1024 */
 		if (0 != network_init(srv)) {
 			plugins_free(srv);
@@ -888,7 +890,7 @@ int main (int argc, char **argv) {
 		}
 #endif
 	} else {
-
+#if 0 /* VADIM - no limitation on max conn number */
 #ifdef HAVE_GETRLIMIT
 		if (0 != getrlimit(RLIMIT_NOFILE, &rlim)) {
 			log_error_write(srv, __FILE__, __LINE__,
@@ -935,7 +937,7 @@ int main (int argc, char **argv) {
 				return -1;
 			}
 		}
-
+#endif
 		if (0 != network_init(srv)) {
 			plugins_free(srv);
 			server_free(srv);
@@ -943,7 +945,7 @@ int main (int argc, char **argv) {
 			return -1;
 		}
 	}
-
+#if 0 /* VADIM - no limitation on max conn number */
 	/* set max-conns */
 	if (srv->srvconf.max_conns > srv->max_fds/2) {
 		/* we can't have more connections than max-fds/2 */
@@ -956,7 +958,7 @@ int main (int argc, char **argv) {
 		/* or use the default: we really don't want to hit max-fds */
 		srv->max_conns = srv->max_fds/3;
 	}
-
+#endif
 	if (HANDLER_GO_ON != plugins_call_init(srv)) {
 		log_error_write(srv, __FILE__, __LINE__, "s", "Initialization of plugins failed. Going down.");
 

@@ -101,7 +101,7 @@ int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, 
 		c = next;
 	}
 	while(ipaugenblick_socket_kick(fd) != 0);
-	return rc;
+	return (rc != 0) ? 1 : 0;
 }
 
 void network_ipaugenblick_readall(int fd)

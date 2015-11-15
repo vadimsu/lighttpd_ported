@@ -330,7 +330,7 @@ static int connection_handle_read(server *srv, connection *con) {
 
 	len = recv(con->fd, mem, mem_len, 0);
 #else /* __WIN32 */
-	
+	int read_this_time = 0;	
 	do {
 		len = 0;
 		int segment_len = 0;
@@ -351,11 +351,13 @@ static int connection_handle_read(server *srv, connection *con) {
 			chunkqueue_append_buffer(con->read_queue,b);
 			chunkqueue_use_memory(con->read_queue, segment_len);
 			con->bytes_read += len;
+			read_this_time += len;
                         rxbuff = ipaugenblick_get_next_buffer_segment_and_detach_first(&pdesc,&segment_len);
                 }
 	} while(1);
-#endif /* __WIN32 */	
-	
+#endif /* __WIN32 */
+//	if (read_this_time == 0) printf("%s %d %p\n",__FILE__,__LINE__,con);
+	con->is_readable = (read_this_time) ? 1 : 0;	
 	return 0;
 }
 
@@ -1069,11 +1071,11 @@ connection *connection_accept(server *srv, server_socket *srv_socket) {
 	 *
 	 * see #1216
 	 */
-
+#if 0
 	if (srv->conns->used >= srv->max_conns) {
 		return NULL;
 	}
-
+#endif
 	cnt_len = sizeof(cnt_addr);
 
 	int cnt_len_int = cnt_len;
