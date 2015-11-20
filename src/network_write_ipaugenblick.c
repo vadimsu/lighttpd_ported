@@ -106,4 +106,13 @@ int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, 
 
 void network_ipaugenblick_readall(int fd)
 {
+	int len = 0;
+	int segment_len = 0;
+	void *pdesc = NULL;
+	void *rxbuff = NULL;
+
+	while(ipaugenblick_receive(fd, &rxbuff, &len, &segment_len,&pdesc) == 0) {
+		ipaugenblick_release_rx_buffer(pdesc, fd);
+		len = 0;
+	}
 }

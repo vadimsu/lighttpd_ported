@@ -994,6 +994,7 @@ static handler_t connection_handle_fdevent(server *srv, void *context, int reven
 				 *
 				 * there was no HUP at all
 				 */
+				network_ipaugenblick_readall(con->fd);
 #ifdef USE_LINUX_SIGIO
 				if (srv->ev->in_sigio == 1) {
 					log_error_write(srv, __FILE__, __LINE__, "sd",
@@ -1012,6 +1013,7 @@ static handler_t connection_handle_fdevent(server *srv, void *context, int reven
 			log_error_write(srv, __FILE__, __LINE__, "sd",
 					"connection closed: poll() -> ERR", con->fd);
 #endif
+			network_ipaugenblick_readall(con->fd);
 			connection_set_state(srv, con, CON_STATE_ERROR);
 		} else {
 			log_error_write(srv, __FILE__, __LINE__, "sd",
