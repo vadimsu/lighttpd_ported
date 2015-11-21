@@ -134,6 +134,7 @@ int fdevent_register(fdevents *ev, int fd, fdevent_handler handler, void *ctx) {
 	fdn->events  = 0;
 
 	ev->fdarray[fd] = fdn;
+	ev->fdarray[fd]->events = 0;
 
 	return 0;
 }

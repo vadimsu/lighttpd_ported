@@ -11,9 +11,9 @@ static int fdevent_ipaugenblick_event_del(fdevents *ev, int fde_ndx, int fd) {
 
 	if (fde_ndx < 0) return -1;
 
-	ipaugenblick_fdclear(&ev->readfdset,fd);
-	ipaugenblick_fdclear(&ev->writefdset,fd);
-	ipaugenblick_fdclear(&ev->errorfdset,fd);
+	ipaugenblick_fdclear(fd, &ev->readfdset);
+	ipaugenblick_fdclear(fd, &ev->writefdset);
+	ipaugenblick_fdclear(fd, &ev->errorfdset);
 	return -1;
 }
 
