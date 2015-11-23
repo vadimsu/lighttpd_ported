@@ -52,7 +52,6 @@ static void ssl_info_callback(const SSL *ssl, int where, int ret) {
 static handler_t network_server_handle_fdevent(server *srv, void *context, int revents) {
 	server_socket *srv_socket = (server_socket *)context;
 	connection *con;
-	int loops = 0;
 
 	UNUSED(context);
 
@@ -67,7 +66,7 @@ static handler_t network_server_handle_fdevent(server *srv, void *context, int r
 	/* accept()s at most 100 connections directly
 	 *
 	 * we jump out after 100 to give the waiting connections a chance */
-	for (loops = 0; loops < 100 && NULL != (con = connection_accept(srv, srv_socket)); loops++) {
+	for (; NULL != (con = connection_accept(srv, srv_socket));) {
 		handler_t r;
 
 		connection_state_machine(srv, con);
