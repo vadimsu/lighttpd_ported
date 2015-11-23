@@ -1196,10 +1196,11 @@ static void buffer_urldecode_internal(buffer *url, int is_query) {
 
 	*dst = '\0';
 	url->used = dst_idx;
+	int buffer_idx = dst_idx / 1448;
 	ipaugenblick_set_buffer_data_len(
-				url->bufs_and_desc[dst_idx].pdesc,
+				url->bufs_and_desc[buffer_idx].pdesc,
 				ipaugenblick_get_buffer_data_len(
-				url->bufs_and_desc[dst_idx].pdesc)+delta);
+				url->bufs_and_desc[buffer_idx].pdesc)+delta);
 }
 
 void buffer_urldecode_path(buffer *url) {
