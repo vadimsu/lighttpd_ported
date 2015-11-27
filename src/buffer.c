@@ -28,11 +28,39 @@ static void dump_buffer(buffer *b)
 	printf("\n");
 #endif
 }
+#ifdef USE_MEMPOOLS
+void *g_buffer_pool = NULL;
+void *g_sg_buffer_pool = NULL;
 
+void buffer_pool_init()
+{
+	int i;
+	void *mem;
+	g_buffer_pool = ipaugenblick_create_ring("bufpool", LIGHTTPD_BUFFER_NUMBER);
+	force_assert(g_buffer_pool);
+	g_sg_buffer_pool = ipaugenblick_create_ring("sgbufpool", LIGHTTPD_SG_BUFFER_NUMBER);	
+	force_assert(g_sg_buffer_pool);
+	
+	for(i = 0;i < LIGHTTPD_BUFFER_NUMBER;i++) {
+		mem = ipaugenblick_mem_get(sizeof(buffer));
+		force_assert(mem);
+		ipaugenblick_ring_free(g_buffer_pool, mem);
+	}
+	for(i = 0;i < LIGHTTPD_SG_BUFFER_NUMBER;i++) {
+		mem = ipaugenblick_mem_get(sizeof(struct data_and_descriptor)*16);
+		force_assert(mem);
+		ipaugenblick_ring_free(g_sg_buffer_pool, mem);
+	}	
+}
+#endif
 buffer* buffer_init(void) {
 	buffer *b;
-
+#ifdef USE_MEMPOOLS
+	force_assert(g_buffer_pool);
+	b = (buffer *)ipaugenblick_ring_get(g_buffer_pool);
+#else
 	b = malloc(sizeof(*b));
+#endif
 	force_assert(b);
 
 	b->ptr = NULL;
@@ -40,6 +68,7 @@ buffer* buffer_init(void) {
 	b->used = 0;
 	b->buffers_count = 0;
 	b->bufs_and_desc = NULL;
+	b->is_rx = 0;
 
 	return b;
 }
@@ -60,12 +89,28 @@ void buffer_free(buffer *b) {
 	if (NULL == b) return;
 	int i;
 	for(i = 0; i < b->buffers_count; i++) {
-		ipaugenblick_release_tx_buffer(b->bufs_and_desc[i].pdesc);
+		if (b->is_rx) {
+			ipaugenblick_release_rx_buffer(b->bufs_and_desc[i].pdesc, b->fd);
+		}
+		else {
+			ipaugenblick_release_tx_buffer(b->bufs_and_desc[i].pdesc);
+		}
 	}
-	free(b->bufs_and_desc);
-	b->bufs_and_desc = NULL;
+	if (b->bufs_and_desc) {
+#ifdef USE_MEMPOOLS
+		ipaugenblick_ring_free(g_sg_buffer_pool, b->bufs_and_desc);
+#else
+		free(b->bufs_and_desc);
+#endif
+		b->bufs_and_desc = NULL;
+	}
 	b->buffers_count = 0;
-	free(b);
+	b->is_rx = 0;
+#ifdef USE_MEMPOOLS
+	ipaugenblick_ring_free(g_buffer_pool, b);
+#else
+        free(b);
+#endif
 }
 
 void buffer_reset(buffer *b) {
@@ -75,15 +120,25 @@ void buffer_reset(buffer *b) {
 	int idx;
 
 	for(idx = 0; idx < b->buffers_count; idx++)
-		ipaugenblick_release_tx_buffer(b->bufs_and_desc[idx].pdesc);
+		if (b->is_rx) {
+			ipaugenblick_release_rx_buffer(b->bufs_and_desc[idx].pdesc, b->fd);
+		}
+		else {
+			ipaugenblick_release_tx_buffer(b->bufs_and_desc[idx].pdesc);
+		}
 	b->ptr = NULL;
 	b->size = 0;
 	b->used = 0;
 	if (b->bufs_and_desc) {
+#ifdef USE_MEMPOOLS
+		ipaugenblick_ring_free(g_sg_buffer_pool, b->bufs_and_desc);
+#else
 		free(b->bufs_and_desc);
+#endif
 		b->bufs_and_desc = NULL;
 	}
 	b->buffers_count = 0;
+	b->is_rx = 0;
 }
 
 char *buffer_get_byte_addr(const buffer *b, int idx)
@@ -112,6 +167,7 @@ void buffer_move(buffer *b, buffer *src) {
 	if (NULL == src) return;
 
 	tmp = *src; *src = *b; *b = tmp;
+	b->is_rx = 0;
 }
 
 #define BUFFER_PIECE_SIZE 64
@@ -126,6 +182,7 @@ static void buffer_realloc(buffer *b, size_t size);
 static void buffer_alloc(buffer *b, size_t size) {
 	int number_of_buffers;
 	force_assert(NULL != b);
+	force_assert(b->is_rx == 0);
 	if (0 == size) size = 1;
 
 	if (size <= b->size) return;
@@ -137,7 +194,13 @@ static void buffer_alloc(buffer *b, size_t size) {
 
 	b->used = 0;
 	number_of_buffers = size / 1448 + ((size%1448) != 0);
+	force_assert(number_of_buffers <= 16);
+#ifdef USE_MEMPOOLS
+	b->bufs_and_desc = ipaugenblick_ring_get(g_sg_buffer_pool);
+#else
 	b->bufs_and_desc = calloc(number_of_buffers, sizeof(b->bufs_and_desc[0]));
+#endif
+	force_assert(b->bufs_and_desc);
 	force_assert(ipaugenblick_get_buffers_bulk(size, 
 						-1, 
 						number_of_buffers, 
@@ -146,6 +209,23 @@ static void buffer_alloc(buffer *b, size_t size) {
 	b->size = /*size*/b->buffers_count*1448;
 	b->ptr = b->bufs_and_desc[0].pdata;
 	force_assert(NULL != b->ptr);
+}
+
+buffer *buffer_alloc_for_binary(int size)
+{
+	buffer *b = buffer_init();
+	b->used = 0;
+	b->buffers_count = size / 1448 + ((size%1448) != 0);
+	force_assert(b->buffers_count <= 16);
+#ifdef USE_MEMPOOLS
+	b->bufs_and_desc = ipaugenblick_ring_get(g_sg_buffer_pool);
+#else
+	b->bufs_and_desc = calloc(b->buffers_count, sizeof(b->bufs_and_desc[0]));
+#endif
+	force_assert(b->bufs_and_desc);
+	b->size = /*size*/b->buffers_count*1448;
+	b->is_rx = 1;
+	return b;
 }
 
 /* make sure buffer is at least "size" big. keep old data */
@@ -159,8 +239,12 @@ static void buffer_realloc(buffer *b, size_t size) {
 
 	int delta = size - b->size;
 	number_of_buffers = delta / 1448 + ((delta%1448) != 0);
-	b->bufs_and_desc = realloc(b->bufs_and_desc, 
-			((b->buffers_count + number_of_buffers) *sizeof(b->bufs_and_desc[0])));
+	struct data_and_descriptor *bufs_and_desc = b->bufs_and_desc;
+	int old_number_of_buffers = b->buffers_count;
+	force_assert((old_number_of_buffers + number_of_buffers) <= 16);
+
+	//b->bufs_and_desc = ipaugenblick_ring_get(g_sg_buffer_pool);
+	//memcpy(b->bufs_and_desc, bufs_and_desc, sizeof(*bufs_and_desc)*old_number_of_buffers);
 	force_assert(ipaugenblick_get_buffers_bulk(
 			size,
 			-1, 

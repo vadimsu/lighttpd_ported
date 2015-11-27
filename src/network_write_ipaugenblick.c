@@ -32,7 +32,6 @@ int network_ipaugenblick_file_chunk(server *srv, connection *con, int fd, chunkq
 	}
 
 	if (0 != network_open_file_chunk(srv, con, cq)) return -1;
-
 	int buffers_count = toSend / 1448 + ((toSend % 1448) ? 1 : 0);
 	struct data_and_descriptor bufs_and_desc[buffers_count];
 	int offsets[buffers_count];
@@ -56,14 +55,13 @@ int network_ipaugenblick_file_chunk(server *srv, connection *con, int fd, chunkq
 		offsets[buf_idx] = 0;
 		lengths[buf_idx] = toRead;
 		ipaugenblick_set_buffer_data_len(bufs_and_desc[buf_idx].pdesc, toRead);
-//		ipaugenblick_update_rfc(c->mem->bufs_and_desc[i].pdesc, 1);
 		buf_idx++;
 		toSend -= toRead;
 	}
 
 	rc = ipaugenblick_send_bulk(fd, bufs_and_desc, offsets, lengths, buffers_count);
 	if (!rc)
-		chunkqueue_mark_written(cq, toSend2 - toSend);
+		chunkqueue_mark_written(cq, toSend2 - toSend + 1);
 
 	return rc;
 }
@@ -72,6 +70,7 @@ int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, 
 	int buffer_count = 0, i, rc;
 	chunk* next;
 	chunk* c = cq->first;
+
 	while (max_bytes > 0 && c) {
 		next = c->next;
 		switch (/*cq->first*/c->type) {
@@ -83,13 +82,14 @@ int network_ipaugenblick_chunkqueue_write(server *srv, connection *con, int fd, 
 				for(i = 0; i < c->mem->buffers_count;i++) {
 					offsets[i] = c->offset;
 					lengths[i] = ipaugenblick_get_buffer_data_len(c->mem->bufs_and_desc[i].pdesc);
-					ipaugenblick_update_rfc(c->mem->bufs_and_desc[i].pdesc, 1);
 				}
-				rc = ipaugenblick_send_bulk(fd, c->mem->bufs_and_desc, offsets, lengths, c->mem->buffers_count);	
+				rc = ipaugenblick_send_bulk(fd, c->mem->bufs_and_desc, offsets, lengths, c->mem->buffers_count);
 				if (rc)
 					next = NULL;/* force exit loop */
-				else
+				else {
+					c->mem->buffers_count = 0;
 					chunkqueue_mark_written(cq, c->mem->used);
+				}
 			}
 			break;
 		case FILE_CHUNK:

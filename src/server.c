@@ -578,7 +578,10 @@ int main (int argc, char **argv) {
 	interval.it_value.tv_usec = 0;	
 #endif
 	ipaugenblick_app_init(argc,argv,argv[0]);
-
+#ifdef USE_MEMPOOLS
+	buffer_pool_init();
+	chunk_pool_init();
+#endif
 	/* for nice %b handling in strfime() */
 	setlocale(LC_TIME, "C");
 

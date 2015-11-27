@@ -18,6 +18,9 @@
 # include <inttypes.h>
 #endif
 
+#define LIGHTTPD_BUFFER_NUMBER 16384*4
+#define LIGHTTPD_SG_BUFFER_NUMBER 16384*4
+
 /* generic string + binary data container; contains a terminating 0 in both
  * cases
  *
@@ -38,13 +41,16 @@ typedef struct {
 	size_t size;
 	struct data_and_descriptor *bufs_and_desc;
 	int buffers_count;
+	int is_rx;
+	int fd;
 } buffer;
 
 /* create new buffer; either empty or copy given data */
+void buffer_pool_init();
 buffer* buffer_init(void);
 buffer* buffer_init_buffer(const buffer *src); /* src can  be NULL */
 buffer* buffer_init_string(const char *str); /* str can  be NULL */
-
+buffer *buffer_alloc_for_binary(int size);
 void buffer_free(buffer *b); /* b can be NULL */
 /* truncates to used == 0; frees large buffers, might keep smaller ones for reuse */
 void buffer_reset(buffer *b); /* b can be NULL */

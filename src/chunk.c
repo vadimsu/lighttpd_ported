@@ -19,11 +19,42 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <ipaugenblick_api.h>
+#ifdef USE_MEMPOOLS
+void *g_chunkqueue_pool = NULL;
+void *g_chunk_pool = NULL;
 
+void chunk_pool_init()
+{
+	int i;
+	void *mem;
+	g_chunkqueue_pool = ipaugenblick_create_ring("chqpool", LIGHTTPD_CHUNKQUEUE_NUMBER);
+	force_assert(g_chunkqueue_pool);
+	g_chunk_pool = ipaugenblick_create_ring("chpool", LIGHTTPD_CHUNK_NUMBER);	
+	force_assert(g_chunk_pool);
+
+	for(i = 0;i < LIGHTTPD_CHUNKQUEUE_NUMBER;i++) {
+		mem = ipaugenblick_mem_get(sizeof(chunkqueue));
+		force_assert(mem);
+		ipaugenblick_ring_free(g_chunkqueue_pool, mem);
+	}
+	for(i = 0;i < LIGHTTPD_CHUNK_NUMBER;i++) {
+		mem = ipaugenblick_mem_get(sizeof(struct data_and_descriptor)*16);
+		force_assert(mem);
+		ipaugenblick_ring_free(g_chunk_pool, mem);
+	}
+}
+#endif
 chunkqueue *chunkqueue_init(void) {
 	chunkqueue *cq;
-
+#ifdef USE_MEMPOOLS
+	force_assert(g_chunkqueue_pool);
+	cq = ipaugenblick_ring_get(g_chunkqueue_pool);
+#else
 	cq = calloc(1, sizeof(*cq));
+#endif
+	force_assert(cq);
+	memset(cq, 0, sizeof(*cq));
 
 	cq->first = NULL;
 	cq->last = NULL;
@@ -35,8 +66,14 @@ chunkqueue *chunkqueue_init(void) {
 
 static chunk *chunk_init(void) {
 	chunk *c;
-
+#ifdef USE_MEMPOOLS
+	force_assert(g_chunk_pool);
+	c = ipaugenblick_ring_get(g_chunk_pool);
+#else
 	c = calloc(1, sizeof(*c));
+#endif
+	force_assert(c);
+	memset(c, 0, sizeof(*c));
 
 	c->type = MEM_CHUNK;
 	c->mem = buffer_init();
@@ -87,8 +124,11 @@ static void chunk_free(chunk *c) {
 
 	buffer_free(c->mem);
 	buffer_free(c->file.name);
-
-	free(c);
+#ifdef USE_MEMPOOLS
+	ipaugenblick_ring_free(g_chunk_pool, c);
+#else
+	 free(c);
+#endif
 }
 
 static off_t chunk_remaining_length(const chunk *c) {
@@ -124,8 +164,11 @@ void chunkqueue_free(chunkqueue *cq) {
 		c = c->next;
 		chunk_free(pc);
 	}
-
-	free(cq);
+#ifdef USE_MEMPOOLS
+	ipaugenblick_ring_free(g_chunkqueue_pool, cq);
+#else
+	 free(cq);
+#endif
 }
 
 static void chunkqueue_push_unused_chunk(chunkqueue *cq, chunk *c) {
@@ -219,7 +262,6 @@ void chunkqueue_append_buffer(chunkqueue *cq, buffer *mem) {
 	chunk *c;
 
 	if (buffer_string_is_empty(mem)) return;
-
 	c = chunkqueue_get_unused_chunk(cq);
 	c->type = MEM_CHUNK;
 	force_assert(NULL != c->mem);
@@ -576,7 +618,6 @@ void chunkqueue_mark_written(chunkqueue *cq, off_t len) {
 
 	for (c = cq->first; NULL != c; c = cq->first) {
 		off_t c_len = chunk_remaining_length(c) + 1;
-
 		if (0 == written && 0 != c_len) break; /* no more finished chunks */
 
 		if (written >= c_len) { /* chunk got finished */
@@ -585,7 +626,6 @@ void chunkqueue_mark_written(chunkqueue *cq, off_t len) {
 
 			cq->first = c->next;
 			if (c == cq->last) cq->last = NULL;
-
 			chunkqueue_push_unused_chunk(cq, c);
 		} else { /* partial chunk */
 			c->offset += written;

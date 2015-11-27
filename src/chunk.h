@@ -4,6 +4,9 @@
 #include "buffer.h"
 #include "array.h"
 
+#define LIGHTTPD_CHUNKQUEUE_NUMBER 16384
+#define LIGHTTPD_CHUNK_NUMBER 16384*4
+
 typedef struct chunk {
 	enum { MEM_CHUNK, FILE_CHUNK } type;
 
@@ -47,6 +50,7 @@ typedef struct {
 } chunkqueue;
 
 chunkqueue *chunkqueue_init(void);
+void chunk_pool_init(void);
 void chunkqueue_set_tempdirs(chunkqueue *cq, array *tempdirs);
 void chunkqueue_append_file(chunkqueue *cq, buffer *fn, off_t offset, off_t len); /* copies "fn" */
 void chunkqueue_append_mem(chunkqueue *cq, const char *mem, size_t len); /* copies memory */

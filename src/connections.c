@@ -339,19 +339,25 @@ static int connection_handle_read(server *srv, connection *con) {
 		buffer *b;
 		if (ipaugenblick_receive(con->fd, &rxbuff, &len, &segment_len,&pdesc) != 0)
 			break;
+
 		while(rxbuff) {
-                	b = buffer_init();
+                	b = buffer_alloc_for_binary(segment_len);
 			b->ptr = rxbuff;
 			b->size = 1448;
-			b->used = segment_len;
-			b->bufs_and_desc = malloc(sizeof(b->bufs_and_desc[0]));
+			b->used = segment_len+1;
 			b->buffers_count = 1;
 			b->bufs_and_desc[0].pdesc = pdesc;
 			b->bufs_and_desc[0].pdata = rxbuff;
+			b->buffers_count = 1;
+			b->ptr = b->bufs_and_desc[0].pdata;
+			b->fd = con->fd;
 			chunkqueue_append_buffer(con->read_queue,b);
-			chunkqueue_use_memory(con->read_queue, segment_len);
-			con->bytes_read += len;
-			read_this_time += len;
+			buffer_free(b);
+//			chunkqueue_use_memory(con->read_queue, segment_len);
+//			con->read_queue->bytes_in += segment_len;
+
+			con->bytes_read += segment_len;
+			read_this_time += segment_len;
                         rxbuff = ipaugenblick_get_next_buffer_segment_and_detach_first(&pdesc,&segment_len);
                 }
 	} while(1);
@@ -1219,7 +1225,6 @@ int connection_state_machine(server *srv, connection *con) {
 
 							con->error_handler_saved_status = con->http_status;
 							con->http_status = 0;
-
 							if (buffer_string_is_empty(con->error_handler)) {
 								buffer_copy_buffer(con->request.uri, con->conf.error_handler);
 							} else {
