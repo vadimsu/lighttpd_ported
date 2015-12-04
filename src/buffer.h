@@ -18,6 +18,8 @@
 # include <inttypes.h>
 #endif
 
+#include <ipaugenblick_api.h>
+
 #define LIGHTTPD_BUFFER_NUMBER 16384*4
 #define LIGHTTPD_SG_BUFFER_NUMBER 16384*4
 
@@ -41,6 +43,8 @@ typedef struct {
 	size_t size;
 	struct data_and_descriptor *bufs_and_desc;
 	int buffers_count;
+	int current_buffer_idx;
+	char *p_current;
 	int is_rx;
 	int fd;
 } buffer;
@@ -197,8 +201,14 @@ static inline size_t buffer_string_space(const buffer *b) {
 	return b->size - b->used;
 }
 
-char *buffer_get_byte_addr(const buffer *b, int idx);
-size_t buffer_get_contigous_space(int idx);
+static inline char *buffer_get_byte_addr(const buffer *b, int idx)
+{
+	int buffer_idx = idx / 1448;
+	int buffer_offset = idx%1448;
+
+	force_assert(buffer_idx < b->buffers_count);
+	return ((char *)b->bufs_and_desc[buffer_idx].pdata) + buffer_offset;
+}
 
 static inline void buffer_append_slash(buffer *b) {
 	size_t len = buffer_string_length(b);
